@@ -1,74 +1,58 @@
+import DonutChart from '../components/DonutChart'
+import LineChart from '../components/LineChart'
+import StatsCards from '../components/StatsCards'
 import { Entry } from '../lib/types'
 import { calculateStats } from '../lib/scoring'
 
-const InsightsPage = ({ entries }: { entries: Entry[] }) => {
+const InsightsPage = ({ entries, trackerName }: { entries: Entry[]; trackerName: string }) => {
   const stats = calculateStats(entries)
-  const totalLast30 = stats.last30.green + stats.last30.yellow + stats.last30.red
-  const totalLast7 = stats.last7.green + stats.last7.yellow + stats.last7.red
-
-  const barWidth = (count: number, total: number) =>
-    total === 0 ? 0 : Math.round((count / total) * 100)
 
   return (
     <section className="page">
       <header className="page-header">
         <p className="eyebrow">Insights</p>
-        <h1>Momentum snapshot</h1>
+        <h1>{trackerName}</h1>
         <p className="subtle">Progress stays even when a day is red.</p>
       </header>
 
-      <div className="card">
-        <h3>Last 30 days</h3>
-        <p className="subtle">You logged {stats.loggedLast30} of the last 30 days.</p>
-        <div className="chart">
-          <div className="chart-row green" style={{ width: `${barWidth(stats.last30.green, totalLast30)}%` }}>
-            Green {stats.last30.green}
-          </div>
-          <div className="chart-row yellow" style={{ width: `${barWidth(stats.last30.yellow, totalLast30)}%` }}>
-            Yellow {stats.last30.yellow}
-          </div>
-          <div className="chart-row red" style={{ width: `${barWidth(stats.last30.red, totalLast30)}%` }}>
-            Red {stats.last30.red}
-          </div>
+      <div className="card insights-grid">
+        <div className="chart-block">
+          <h3>Last 7 days</h3>
+          <DonutChart counts={stats.last7} />
+        </div>
+        <div className="chart-block">
+          <h3>Last 30 days</h3>
+          <DonutChart counts={stats.last30} />
+        </div>
+        <div className="chart-block full">
+          <h3>30-day momentum</h3>
+          <LineChart values={stats.dailyScores} height={160} />
         </div>
       </div>
 
       <div className="card">
-        <h3>This week</h3>
-        <div className="stat-grid">
-          <div>
-            <span className="stat-value">{totalLast7}</span>
-            <span className="stat-label">Days logged</span>
-          </div>
-          <div>
-            <span className="stat-value">{stats.loggingStreak}</span>
-            <span className="stat-label">Logging streak</span>
-          </div>
-          <div>
-            <span className="stat-value">{stats.currentGreenStreak}</span>
-            <span className="stat-label">Green streak</span>
-          </div>
-        </div>
+        <h3>Stats</h3>
+        <StatsCards
+          items={[
+            { label: 'Best green streak', value: stats.bestGreenStreak },
+            { label: 'Current green streak', value: stats.currentGreenStreak },
+            { label: 'Logging streak', value: stats.loggingStreak },
+            { label: 'Completion rate', value: `${stats.consistencyMonthly}%` }
+          ]}
+        />
       </div>
 
       <div className="card">
-        <h3>Momentum score</h3>
-        <p className="score">{stats.momentumScore}</p>
+        <h3>Momentum scores</h3>
+        <StatsCards
+          items={[
+            { label: 'Weekly momentum', value: stats.momentumWeekly },
+            { label: 'Monthly momentum', value: stats.momentumMonthly },
+            { label: 'Consistency (7d)', value: `${stats.consistencyWeekly}%` },
+            { label: 'Consistency (30d)', value: `${stats.consistencyMonthly}%` }
+          ]}
+        />
         <p className="subtle">Green = +3, Yellow = +1, Red = 0. Chain bonus rewards consecutive greens.</p>
-      </div>
-
-      <div className="card">
-        <h3>Best streaks</h3>
-        <div className="stat-grid">
-          <div>
-            <span className="stat-value">{stats.bestGreenStreakEver}</span>
-            <span className="stat-label">Best green streak</span>
-          </div>
-          <div>
-            <span className="stat-value">{stats.bestLoggingStreak}</span>
-            <span className="stat-label">Best logging streak</span>
-          </div>
-        </div>
       </div>
     </section>
   )

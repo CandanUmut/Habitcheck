@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateStats } from './scoring'
+import { calculateDailyScores, calculateStats } from './scoring'
 import { Entry } from './types'
 
 const makeEntry = (date: string, status: Entry['status']): Entry => ({
@@ -19,7 +19,7 @@ describe('scoring', () => {
     ]
 
     const stats = calculateStats(entries, new Date(2024, 0, 5))
-    expect(stats.bestGreenStreakEver).toBe(2)
+    expect(stats.bestGreenStreak).toBe(2)
     expect(stats.currentGreenStreak).toBe(2)
     expect(stats.loggingStreak).toBe(5)
     expect(stats.last7.green).toBe(4)
@@ -35,6 +35,19 @@ describe('scoring', () => {
 
     const stats = calculateStats(entries, new Date(2024, 0, 3))
     expect(stats.currentGreenStreak).toBe(1)
-    expect(stats.bestGreenStreakEver).toBe(1)
+    expect(stats.bestGreenStreak).toBe(1)
+  })
+
+  it('builds a daily score trend', () => {
+    const entries: Entry[] = [
+      makeEntry('2024-01-01', 'green'),
+      makeEntry('2024-01-02', 'green'),
+      makeEntry('2024-01-03', 'yellow')
+    ]
+
+    const trend = calculateDailyScores(entries, 3, new Date(2024, 0, 3))
+    expect(trend.length).toBe(3)
+    expect(trend[0]).toBeGreaterThan(3)
+    expect(trend[2]).toBe(1)
   })
 })

@@ -1,5 +1,5 @@
 import { Entry, Status } from './types'
-import { formatDate, lastNDays, parseDate } from './date'
+import { formatDate, lastNDays, parseDate } from './dates'
 
 export const GREEN_POINTS = 3
 export const YELLOW_POINTS = 1
@@ -16,13 +16,17 @@ export type SummaryCounts = {
 export type TrackerStats = {
   last7: SummaryCounts
   last30: SummaryCounts
+  loggedLast7: number
   loggedLast30: number
   currentGreenStreak: number
   bestGreenStreak: number
   loggingStreak: number
-  bestGreenStreakEver: number
   bestLoggingStreak: number
-  momentumScore: number
+  momentumWeekly: number
+  momentumMonthly: number
+  consistencyWeekly: number
+  consistencyMonthly: number
+  dailyScores: number[]
 }
 
 const statusPoints = (status: Status): number => {
@@ -33,56 +37,43 @@ const statusPoints = (status: Status): number => {
 
 const initCounts = (): SummaryCounts => ({ green: 0, yellow: 0, red: 0 })
 
-const sortEntries = (entries: Entry[]): Entry[] =>
-  [...entries].sort((a, b) => a.date.localeCompare(b.date))
-
 const mapEntries = (entries: Entry[]): Map<string, Entry> =>
   new Map(entries.map((entry) => [entry.date, entry]))
 
-export const calculateStats = (entries: Entry[], today = new Date()): TrackerStats => {
-  const entryMap = mapEntries(entries)
-  const last7 = initCounts()
-  const last30 = initCounts()
-  let loggedLast30 = 0
-  let momentumScore = 0
-
-  const last7Days = lastNDays(7, today)
-  const last30Days = lastNDays(30, today)
-
-  last7Days.forEach((day) => {
-    const entry = entryMap.get(formatDate(day))
-    if (!entry) return
-    last7[entry.status] += 1
-  })
-
+const calculateRangeScore = (entries: Map<string, Entry>, days: Date[]) => {
+  const counts = initCounts()
+  let logged = 0
+  let totalScore = 0
   let greenChain = 0
-  last30Days.forEach((day) => {
-    const entry = entryMap.get(formatDate(day))
+
+  days.forEach((day) => {
+    const entry = entries.get(formatDate(day))
     if (!entry) {
       greenChain = 0
       return
     }
-    loggedLast30 += 1
-    last30[entry.status] += 1
+    logged += 1
+    counts[entry.status] += 1
     if (entry.status === 'green') {
       greenChain += 1
       const chainBonus = Math.min(greenChain * CHAIN_BONUS_PER_DAY, CHAIN_BONUS_CAP)
-      momentumScore += statusPoints(entry.status) + chainBonus
+      totalScore += statusPoints(entry.status) + chainBonus
     } else {
       greenChain = 0
-      momentumScore += statusPoints(entry.status)
+      totalScore += statusPoints(entry.status)
     }
   })
 
-  const sorted = sortEntries(entries)
+  return { counts, logged, totalScore: Number(totalScore.toFixed(1)) }
+}
+
+const calculateStreaks = (entries: Entry[], today: Date) => {
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
   let bestGreenStreak = 0
   let bestLoggingStreak = 0
-  let currentGreenStreak = 0
-  let currentLoggingStreak = 0
-
-  let prevDate: Date | null = null
   let greenStreak = 0
   let loggingStreak = 0
+  let prevDate: Date | null = null
 
   sorted.forEach((entry) => {
     const entryDate = parseDate(entry.date)
@@ -108,7 +99,10 @@ export const calculateStats = (entries: Entry[], today = new Date()): TrackerSta
     prevDate = entryDate
   })
 
+  const entryMap = mapEntries(entries)
   const todayEntry = entryMap.get(formatDate(today))
+  let currentLoggingStreak = 0
+  let currentGreenStreak = 0
   if (todayEntry) {
     currentLoggingStreak = 1
     currentGreenStreak = todayEntry.status === 'green' ? 1 : 0
@@ -130,14 +124,59 @@ export const calculateStats = (entries: Entry[], today = new Date()): TrackerSta
   }
 
   return {
-    last7,
-    last30,
-    loggedLast30,
-    currentGreenStreak,
     bestGreenStreak,
-    loggingStreak: currentLoggingStreak,
-    bestGreenStreakEver: bestGreenStreak,
     bestLoggingStreak,
-    momentumScore: Number(momentumScore.toFixed(1))
+    currentGreenStreak,
+    currentLoggingStreak
+  }
+}
+
+export const calculateDailyScores = (entries: Entry[], days: number, today = new Date()): number[] => {
+  const entryMap = mapEntries(entries)
+  const range = lastNDays(days, today)
+  let greenChain = 0
+  return range.map((day) => {
+    const entry = entryMap.get(formatDate(day))
+    if (!entry) {
+      greenChain = 0
+      return 0
+    }
+    if (entry.status === 'green') {
+      greenChain += 1
+      const chainBonus = Math.min(greenChain * CHAIN_BONUS_PER_DAY, CHAIN_BONUS_CAP)
+      return Number((statusPoints(entry.status) + chainBonus).toFixed(1))
+    }
+    greenChain = 0
+    return statusPoints(entry.status)
+  })
+}
+
+export const calculateStats = (entries: Entry[], today = new Date()): TrackerStats => {
+  const entryMap = mapEntries(entries)
+  const last7Days = lastNDays(7, today)
+  const last30Days = lastNDays(30, today)
+
+  const last7Score = calculateRangeScore(entryMap, last7Days)
+  const last30Score = calculateRangeScore(entryMap, last30Days)
+
+  const streaks = calculateStreaks(entries, today)
+
+  const consistencyWeekly = last7Days.length === 0 ? 0 : Math.round((last7Score.logged / 7) * 100)
+  const consistencyMonthly = last30Days.length === 0 ? 0 : Math.round((last30Score.logged / 30) * 100)
+
+  return {
+    last7: last7Score.counts,
+    last30: last30Score.counts,
+    loggedLast7: last7Score.logged,
+    loggedLast30: last30Score.logged,
+    currentGreenStreak: streaks.currentGreenStreak,
+    bestGreenStreak: streaks.bestGreenStreak,
+    loggingStreak: streaks.currentLoggingStreak,
+    bestLoggingStreak: streaks.bestLoggingStreak,
+    momentumWeekly: last7Score.totalScore,
+    momentumMonthly: last30Score.totalScore,
+    consistencyWeekly,
+    consistencyMonthly,
+    dailyScores: calculateDailyScores(entries, 30, today)
   }
 }

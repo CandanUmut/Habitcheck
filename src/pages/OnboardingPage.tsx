@@ -1,26 +1,24 @@
 import { useState } from 'react'
 import Toggle from '../components/Toggle'
-import { Settings } from '../lib/types'
+import { createTracker } from '../lib/storage'
+import { Tracker } from '../lib/types'
 
 type OnboardingPageProps = {
-  settings: Settings
-  onComplete: (settings: Settings) => void
+  onComplete: (tracker: Tracker) => void
 }
 
-const OnboardingPage = ({ settings, onComplete }: OnboardingPageProps) => {
-  const [goalName, setGoalName] = useState(settings.goalName)
-  const [dailyQuestionEnabled, setDailyQuestionEnabled] = useState(settings.dailyQuestionEnabled)
-  const [dailyQuestionText, setDailyQuestionText] = useState(settings.dailyQuestionText)
+const OnboardingPage = ({ onComplete }: OnboardingPageProps) => {
+  const [goalName, setGoalName] = useState('')
+  const [dailyQuestionEnabled, setDailyQuestionEnabled] = useState(false)
+  const [dailyQuestionText, setDailyQuestionText] = useState('What made today easier or harder?')
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault()
     if (!goalName.trim()) return
-    onComplete({
-      ...settings,
-      goalName: goalName.trim(),
-      dailyQuestionEnabled,
-      dailyQuestionText: dailyQuestionText.trim() || settings.dailyQuestionText
-    })
+    const tracker = createTracker(goalName.trim())
+    tracker.dailyQuestionEnabled = dailyQuestionEnabled
+    tracker.dailyQuestionText = dailyQuestionText.trim() || tracker.dailyQuestionText
+    onComplete(tracker)
   }
 
   return (

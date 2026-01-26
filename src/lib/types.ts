@@ -7,11 +7,23 @@ export type Entry = {
   updatedAt: number
 }
 
-export type Settings = {
-  goalName: string
+export type Tracker = {
+  id: string
+  name: string
   dailyQuestionEnabled: boolean
   dailyQuestionText: string
+}
+
+export type AppSettings = {
   soundsEnabled: boolean
   theme: 'light' | 'dark'
-  reminderTime: string
+  hapticsEnabled: boolean
+}
+
+export type AppData = {
+  version: 2
+  settings: AppSettings
+  trackers: Tracker[]
+  entries: Record<string, Entry[]>
+  activeTrackerId?: string
 }

@@ -1,19 +1,36 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Toggle from '../components/Toggle'
-import { Entry, Settings } from '../lib/types'
-import { defaultSettings, exportData, importData, resetData } from '../lib/storage'
-import { todayString } from '../lib/date'
+import { AppSettings, Entry, Tracker } from '../lib/types'
+import { createTracker, defaultSettings, exportData, importData, resetData } from '../lib/storage'
+import { todayString } from '../lib/dates'
 
 type SettingsPageProps = {
-  settings: Settings
-  entries: Entry[]
-  onUpdateSettings: (settings: Settings) => void
-  onUpdateEntries: (entries: Entry[]) => void
+  settings: AppSettings
+  trackers: Tracker[]
+  activeTrackerId?: string
+  entriesByTracker: Record<string, Entry[]>
+  onUpdateSettings: (settings: AppSettings) => void
+  onUpdateTrackers: (trackers: Tracker[]) => void
+  onUpdateEntries: (entries: Record<string, Entry[]>) => void
+  onUpdateActiveTracker: (id: string) => void
 }
 
-const SettingsPage = ({ settings, entries, onUpdateSettings, onUpdateEntries }: SettingsPageProps) => {
+const SettingsPage = ({
+  settings,
+  trackers,
+  activeTrackerId,
+  entriesByTracker,
+  onUpdateSettings,
+  onUpdateTrackers,
+  onUpdateEntries,
+  onUpdateActiveTracker
+}: SettingsPageProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [importError, setImportError] = useState('')
+  const activeTracker = useMemo(
+    () => trackers.find((tracker) => tracker.id === activeTrackerId) ?? trackers[0],
+    [trackers, activeTrackerId]
+  )
 
   const handleExport = () => {
     const payload = exportData()
@@ -32,10 +49,12 @@ const SettingsPage = ({ settings, entries, onUpdateSettings, onUpdateEntries }: 
     const reader = new FileReader()
     reader.onload = () => {
       try {
-        const parsed = JSON.parse(String(reader.result)) as { settings?: Partial<Settings>; entries?: Entry[] }
+        const parsed = JSON.parse(String(reader.result)) as ReturnType<typeof exportData>
         const imported = importData(parsed)
         onUpdateSettings(imported.settings)
+        onUpdateTrackers(imported.trackers)
         onUpdateEntries(imported.entries)
+        onUpdateActiveTracker(imported.activeTrackerId ?? imported.trackers[0]?.id ?? '')
         setImportError('')
       } catch {
         setImportError('That file does not look like a valid backup.')
@@ -49,7 +68,36 @@ const SettingsPage = ({ settings, entries, onUpdateSettings, onUpdateEntries }: 
     if (!confirmed) return
     resetData()
     onUpdateSettings({ ...defaultSettings })
-    onUpdateEntries([])
+    onUpdateTrackers([])
+    onUpdateEntries({})
+    onUpdateActiveTracker('')
+  }
+
+  const handleAddTracker = () => {
+    const name = window.prompt('Name your tracker')?.trim()
+    if (!name) return
+    const newTracker = createTracker(name)
+    onUpdateTrackers([...trackers, newTracker])
+    onUpdateEntries({ ...entriesByTracker, [newTracker.id]: [] })
+    onUpdateActiveTracker(newTracker.id)
+  }
+
+  const handleRenameTracker = (id: string, name: string) => {
+    onUpdateTrackers(
+      trackers.map((tracker) => (tracker.id === id ? { ...tracker, name: name.trim() || tracker.name } : tracker))
+    )
+  }
+
+  const handleDeleteTracker = (id: string) => {
+    const tracker = trackers.find((item) => item.id === id)
+    if (!tracker) return
+    const confirmed = window.confirm(`Delete ${tracker.name}? This removes its history.`)
+    if (!confirmed) return
+    const nextTrackers = trackers.filter((item) => item.id !== id)
+    const { [id]: _, ...nextEntries } = entriesByTracker
+    onUpdateTrackers(nextTrackers)
+    onUpdateEntries(nextEntries)
+    onUpdateActiveTracker(nextTrackers[0]?.id ?? '')
   }
 
   return (
@@ -61,46 +109,83 @@ const SettingsPage = ({ settings, entries, onUpdateSettings, onUpdateEntries }: 
       </header>
 
       <div className="card">
-        <label className="field">
-          <span>Goal name</span>
-          <input
-            value={settings.goalName}
-            onChange={(event) => onUpdateSettings({ ...settings, goalName: event.target.value })}
-            placeholder="Ex: No scrolling after 9pm"
+        <h3>Trackers</h3>
+        <div className="tracker-settings">
+          {trackers.map((tracker) => (
+            <div key={tracker.id} className="tracker-row">
+              <input
+                value={tracker.name}
+                onChange={(event) => handleRenameTracker(tracker.id, event.target.value)}
+              />
+              <div className="tracker-actions">
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => onUpdateActiveTracker(tracker.id)}
+                >
+                  {tracker.id === activeTrackerId ? 'Active' : 'Set active'}
+                </button>
+                <button type="button" className="ghost" onClick={() => handleDeleteTracker(tracker.id)}>
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button type="button" className="ghost" onClick={handleAddTracker}>
+          + Add tracker
+        </button>
+      </div>
+
+      {activeTracker && (
+        <div className="card">
+          <h3>Daily question</h3>
+          <Toggle
+            label="Daily reflection"
+            description="Show a quick reflection prompt after you choose a color."
+            checked={activeTracker.dailyQuestionEnabled}
+            onChange={(value) =>
+              onUpdateTrackers(
+                trackers.map((tracker) =>
+                  tracker.id === activeTracker.id ? { ...tracker, dailyQuestionEnabled: value } : tracker
+                )
+              )
+            }
           />
-        </label>
+          {activeTracker.dailyQuestionEnabled && (
+            <label className="field">
+              <span>Daily question text</span>
+              <input
+                value={activeTracker.dailyQuestionText}
+                onChange={(event) =>
+                  onUpdateTrackers(
+                    trackers.map((tracker) =>
+                      tracker.id === activeTracker.id
+                        ? { ...tracker, dailyQuestionText: event.target.value }
+                        : tracker
+                    )
+                  )
+                }
+              />
+            </label>
+          )}
+        </div>
+      )}
 
-        <Toggle
-          label="Daily question"
-          description="Show a quick reflection prompt after you choose a color."
-          checked={settings.dailyQuestionEnabled}
-          onChange={(value) => onUpdateSettings({ ...settings, dailyQuestionEnabled: value })}
-        />
-        {settings.dailyQuestionEnabled && (
-          <label className="field">
-            <span>Daily question text</span>
-            <input
-              value={settings.dailyQuestionText}
-              onChange={(event) => onUpdateSettings({ ...settings, dailyQuestionText: event.target.value })}
-            />
-          </label>
-        )}
-
-        <label className="field">
-          <span>Optional reminder time</span>
-          <input
-            type="time"
-            value={settings.reminderTime}
-            onChange={(event) => onUpdateSettings({ ...settings, reminderTime: event.target.value })}
-          />
-          <small className="subtle">We do not send notifications in v1, this is for a future nudge.</small>
-        </label>
-
+      <div className="card">
+        <h3>Preferences</h3>
         <Toggle
           label="Sound effects"
           description="Short sounds after you log a day."
           checked={settings.soundsEnabled}
           onChange={(value) => onUpdateSettings({ ...settings, soundsEnabled: value })}
+        />
+
+        <Toggle
+          label="Haptics"
+          description="Gentle vibrations on mobile after you log."
+          checked={settings.hapticsEnabled}
+          onChange={(value) => onUpdateSettings({ ...settings, hapticsEnabled: value })}
         />
 
         <Toggle

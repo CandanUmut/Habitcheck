@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react'
-import StatusSelector from '../components/StatusSelector'
-import { Entry, Settings, Status } from '../lib/types'
+import { useEffect, useMemo, useState } from 'react'
+import StatusPicker from '../components/StatusPicker'
+import DonutChart from '../components/DonutChart'
+import LineChart from '../components/LineChart'
+import QuoteCard from '../components/QuoteCard'
+import StatsCards from '../components/StatsCards'
+import { Entry, Status, Tracker } from '../lib/types'
 import { playStatusSound } from '../lib/sounds'
+import { todayString } from '../lib/dates'
+import { calculateStats } from '../lib/scoring'
+import { getDailyQuote, getRandomQuote } from '../lib/quotes'
 
 const celebrationCopy: Record<Status, { title: string; message: string }> = {
   green: { title: 'Green logged!', message: 'You are building momentum.' },
@@ -10,22 +17,30 @@ const celebrationCopy: Record<Status, { title: string; message: string }> = {
 }
 
 type HomePageProps = {
-  settings: Settings
-  entry: Entry | undefined
+  tracker: Tracker
+  entries: Entry[]
+  settings: { soundsEnabled: boolean; hapticsEnabled: boolean }
   onSave: (status: Status, note: string) => void
   isActive: boolean
-  showNudge: boolean
 }
 
-const HomePage = ({ settings, entry, onSave, isActive, showNudge }: HomePageProps) => {
+const HomePage = ({ tracker, entries, settings, onSave, isActive }: HomePageProps) => {
+  const todayKey = todayString()
+  const entry = entries.find((item) => item.date === todayKey)
   const [status, setStatus] = useState<Status | null>(entry?.status ?? null)
   const [note, setNote] = useState(entry?.note ?? '')
   const [celebration, setCelebration] = useState<Status | null>(null)
+  const [quote, setQuote] = useState(() => getDailyQuote())
+
+  const stats = useMemo(() => calculateStats(entries), [entries])
+  const last7Summary = `${stats.last7.green}G ${stats.last7.yellow}Y ${stats.last7.red}R`
+  const last30Summary = `${stats.last30.green}G ${stats.last30.yellow}Y ${stats.last30.red}R`
+  const todayStatusLabel = entry ? entry.status.toUpperCase() : 'Not logged'
 
   useEffect(() => {
     setStatus(entry?.status ?? null)
     setNote(entry?.note ?? '')
-  }, [entry])
+  }, [entry?.status, entry?.note])
 
   useEffect(() => {
     if (!isActive) return
@@ -45,30 +60,48 @@ const HomePage = ({ settings, entry, onSave, isActive, showNudge }: HomePageProp
     if (settings.soundsEnabled) {
       playStatusSound(status)
     }
+    if (settings.hapticsEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate(status === 'red' ? 80 : 40)
+    }
     setCelebration(status)
     window.setTimeout(() => setCelebration(null), 1800)
   }
+
+  const handleNewQuote = () => {
+    setQuote(getRandomQuote())
+  }
+
+  const insightCards = [
+    { label: 'Green streak', value: stats.currentGreenStreak },
+    { label: '7-day log', value: last7Summary },
+    { label: '30-day log', value: last30Summary },
+    { label: 'Momentum (wk/mo)', value: `${stats.momentumWeekly} / ${stats.momentumMonthly}` },
+    { label: 'Today status', value: todayStatusLabel }
+  ]
 
   return (
     <section className="page">
       <header className="page-header">
         <p className="eyebrow">Today</p>
-        <h1>{settings.goalName || 'Your daily goal'}</h1>
+        <h1>{tracker.name}</h1>
         <p className="subtle">Log today in under five seconds.</p>
       </header>
 
-      {showNudge && (
-        <div className="nudge">
-          <strong>Quick nudge:</strong> You have not logged today yet.
-        </div>
-      )}
-
-      <StatusSelector value={status} onChange={setStatus} size="large" />
-
-      {settings.dailyQuestionEnabled && (
-        <div className="card">
+      <div className="card logging-card">
+        {entry ? (
+          <div className={`today-status ${entry.status}`}>
+            <span>Today is already logged.</span>
+            <strong>{entry.status.toUpperCase()}</strong>
+          </div>
+        ) : (
+          <div className="nudge">
+            <strong>Quick nudge:</strong> You have not logged today yet.
+          </div>
+        )}
+        <StatusPicker value={status} onChange={setStatus} size="large" />
+        {tracker.dailyQuestionEnabled && (
           <label className="field">
-            <span>{settings.dailyQuestionText}</span>
+            <span>{tracker.dailyQuestionText}</span>
             <textarea
               rows={3}
               value={note}
@@ -76,12 +109,29 @@ const HomePage = ({ settings, entry, onSave, isActive, showNudge }: HomePageProp
               placeholder="A quick note..."
             />
           </label>
-        </div>
-      )}
+        )}
+        <button type="button" className="primary" onClick={handleSave} disabled={!status}>
+          Log today
+        </button>
+      </div>
 
-      <button type="button" className="primary" onClick={handleSave} disabled={!status}>
-        Log today
-      </button>
+      <div className="card insights-card">
+        <h3>Key insights</h3>
+        <StatsCards items={insightCards} />
+        <div className="insights-charts">
+          <div className="chart-block">
+            <p className="subtle">Last 7 days</p>
+            <DonutChart counts={stats.last7} />
+          </div>
+          <div className="chart-block">
+            <p className="subtle">14-day momentum</p>
+            <LineChart values={stats.dailyScores.slice(-14)} />
+            <p className="subtle tiny">Trend updates with every log.</p>
+          </div>
+        </div>
+      </div>
+
+      <QuoteCard quote={quote} onNewQuote={handleNewQuote} />
 
       {celebration && (
         <div className={`celebration ${celebration}`}>

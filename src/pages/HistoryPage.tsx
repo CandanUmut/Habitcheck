@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import CalendarGrid from '../components/CalendarGrid'
-import StatusSelector from '../components/StatusSelector'
+import StatusPicker from '../components/StatusPicker'
 import { Entry, Status } from '../lib/types'
-import { formatDate, todayString } from '../lib/date'
+import { formatDate, todayString } from '../lib/dates'
 
 type HistoryPageProps = {
   entries: Entry[]
+  trackerName: string
   onSave: (date: string, status: Status, note: string) => void
 }
 
-const HistoryPage = ({ entries, onSave }: HistoryPageProps) => {
+const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
   const [month, setMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [status, setStatus] = useState<Status | null>(null)
@@ -42,7 +43,8 @@ const HistoryPage = ({ entries, onSave }: HistoryPageProps) => {
     <section className="page">
       <header className="page-header">
         <p className="eyebrow">History</p>
-        <h1>{month.toLocaleString('default', { month: 'long', year: 'numeric' })}</h1>
+        <h1>{trackerName}</h1>
+        <p className="subtle">{month.toLocaleString('default', { month: 'long', year: 'numeric' })}</p>
         <div className="month-controls">
           <button type="button" className="ghost" onClick={() => goMonth(-1)}>
             ← Prev
@@ -72,7 +74,7 @@ const HistoryPage = ({ entries, onSave }: HistoryPageProps) => {
 
       <div className="card">
         <h3>{selectedKey === todayString() ? 'Today' : selectedKey}</h3>
-        <StatusSelector value={status} onChange={setStatus} size="medium" />
+        <StatusPicker value={status} onChange={setStatus} size="medium" />
         <label className="field">
           <span>Optional note</span>
           <textarea

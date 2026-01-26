@@ -1,16 +1,16 @@
-import { Entry, Settings } from './types'
+import { AppData, AppSettings, Entry, Tracker } from './types'
 
-const SETTINGS_KEY = 'tracker.v1.settings'
-const ENTRIES_KEY = 'tracker.v1.entries'
+const STORAGE_KEY = 'tracker.v2.data'
+const LEGACY_SETTINGS_KEY = 'tracker.v1.settings'
+const LEGACY_ENTRIES_KEY = 'tracker.v1.entries'
 
-const defaultSettings: Settings = {
-  goalName: '',
-  dailyQuestionEnabled: false,
-  dailyQuestionText: 'What made today easier or harder?',
+const defaultSettings: AppSettings = {
   soundsEnabled: true,
   theme: 'light',
-  reminderTime: ''
+  hapticsEnabled: true
 }
+
+const defaultTrackerQuestion = 'What made today easier or harder?'
 
 const safeJsonParse = <T>(value: string | null): T | null => {
   if (!value) return null
@@ -21,17 +21,40 @@ const safeJsonParse = <T>(value: string | null): T | null => {
   }
 }
 
-const ensureSettings = (input: Partial<Settings> | null): Settings => {
+const generateId = (): string => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `tracker-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const ensureSettings = (input: Partial<AppSettings> | null): AppSettings => {
   if (!input) return { ...defaultSettings }
   return {
     ...defaultSettings,
     ...input,
     theme: input.theme === 'dark' ? 'dark' : 'light',
-    dailyQuestionEnabled: Boolean(input.dailyQuestionEnabled),
     soundsEnabled: input.soundsEnabled !== false,
-    goalName: typeof input.goalName === 'string' ? input.goalName : '',
-    reminderTime: typeof input.reminderTime === 'string' ? input.reminderTime : ''
+    hapticsEnabled: input.hapticsEnabled !== false
   }
+}
+
+const ensureTracker = (input: Partial<Tracker> | null): Tracker | null => {
+  if (!input || typeof input.name !== 'string') return null
+  return {
+    id: typeof input.id === 'string' ? input.id : generateId(),
+    name: input.name.trim() || 'My goal',
+    dailyQuestionEnabled: Boolean(input.dailyQuestionEnabled),
+    dailyQuestionText:
+      typeof input.dailyQuestionText === 'string' && input.dailyQuestionText.trim()
+        ? input.dailyQuestionText.trim()
+        : defaultTrackerQuestion
+  }
+}
+
+const ensureTrackers = (input: Tracker[] | null): Tracker[] => {
+  if (!Array.isArray(input)) return []
+  return input.map((tracker) => ensureTracker(tracker)).filter((tracker): tracker is Tracker => Boolean(tracker))
 }
 
 const ensureEntries = (input: Entry[] | null): Entry[] => {
@@ -46,46 +69,98 @@ const ensureEntries = (input: Entry[] | null): Entry[] => {
     }))
 }
 
-export const loadSettings = (): Settings => {
-  if (typeof window === 'undefined') return { ...defaultSettings }
-  return ensureSettings(safeJsonParse<Settings>(localStorage.getItem(SETTINGS_KEY)))
+const ensureEntriesMap = (input: Record<string, Entry[]> | null): Record<string, Entry[]> => {
+  if (!input || typeof input !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(input).map(([key, value]) => [key, ensureEntries(value)])
+  )
 }
 
-export const saveSettings = (settings: Settings): void => {
+const migrateLegacyData = (): AppData => {
+  const legacySettings = safeJsonParse<{
+    goalName?: string
+    dailyQuestionEnabled?: boolean
+    dailyQuestionText?: string
+    soundsEnabled?: boolean
+    theme?: 'light' | 'dark'
+  }>(localStorage.getItem(LEGACY_SETTINGS_KEY))
+  const legacyEntries = safeJsonParse<Entry[]>(localStorage.getItem(LEGACY_ENTRIES_KEY))
+  const trackerName = legacySettings?.goalName?.trim() ?? ''
+
+  if (!trackerName && (!legacyEntries || legacyEntries.length === 0)) {
+    return {
+      version: 2,
+      settings: ensureSettings({ soundsEnabled: legacySettings?.soundsEnabled, theme: legacySettings?.theme }),
+      trackers: [],
+      entries: {},
+      activeTrackerId: undefined
+    }
+  }
+
+  const tracker: Tracker = {
+    id: generateId(),
+    name: trackerName || 'My goal',
+    dailyQuestionEnabled: Boolean(legacySettings?.dailyQuestionEnabled),
+    dailyQuestionText:
+      legacySettings?.dailyQuestionText?.trim() || defaultTrackerQuestion
+  }
+
+  return {
+    version: 2,
+    settings: ensureSettings({ soundsEnabled: legacySettings?.soundsEnabled, theme: legacySettings?.theme }),
+    trackers: [tracker],
+    entries: {
+      [tracker.id]: ensureEntries(legacyEntries ?? null)
+    },
+    activeTrackerId: tracker.id
+  }
+}
+
+const ensureAppData = (input: AppData | null): AppData => {
+  if (!input || input.version !== 2) return migrateLegacyData()
+  const trackers = ensureTrackers(input.trackers ?? [])
+  const entries = ensureEntriesMap(input.entries ?? {})
+  const activeTrackerId = typeof input.activeTrackerId === 'string' ? input.activeTrackerId : trackers[0]?.id
+  return {
+    version: 2,
+    settings: ensureSettings(input.settings ?? null),
+    trackers,
+    entries,
+    activeTrackerId
+  }
+}
+
+export const loadAppData = (): AppData => {
+  if (typeof window === 'undefined') {
+    return { version: 2, settings: { ...defaultSettings }, trackers: [], entries: {}, activeTrackerId: undefined }
+  }
+  const raw = safeJsonParse<AppData>(localStorage.getItem(STORAGE_KEY))
+  return ensureAppData(raw)
+}
+
+export const saveAppData = (data: AppData): void => {
   if (typeof window === 'undefined') return
-  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
 }
 
-export const loadEntries = (): Entry[] => {
-  if (typeof window === 'undefined') return []
-  return ensureEntries(safeJsonParse<Entry[]>(localStorage.getItem(ENTRIES_KEY)))
-}
+export const exportData = (): AppData => loadAppData()
 
-export const saveEntries = (entries: Entry[]): void => {
-  if (typeof window === 'undefined') return
-  localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries))
-}
-
-export const exportData = (): { settings: Settings; entries: Entry[] } => ({
-  settings: loadSettings(),
-  entries: loadEntries()
-})
-
-export const importData = (payload: { settings?: Partial<Settings>; entries?: Entry[] }): {
-  settings: Settings
-  entries: Entry[]
-} => {
-  const settings = ensureSettings(payload.settings ?? null)
-  const entries = ensureEntries(payload.entries ?? null)
-  saveSettings(settings)
-  saveEntries(entries)
-  return { settings, entries }
+export const importData = (payload: AppData): AppData => {
+  const sanitized = ensureAppData(payload)
+  saveAppData(sanitized)
+  return sanitized
 }
 
 export const resetData = (): void => {
   if (typeof window === 'undefined') return
-  localStorage.removeItem(SETTINGS_KEY)
-  localStorage.removeItem(ENTRIES_KEY)
+  localStorage.removeItem(STORAGE_KEY)
 }
 
-export { SETTINGS_KEY, ENTRIES_KEY, defaultSettings }
+export const createTracker = (name: string): Tracker => ({
+  id: generateId(),
+  name: name.trim() || 'My goal',
+  dailyQuestionEnabled: false,
+  dailyQuestionText: defaultTrackerQuestion
+})
+
+export { defaultSettings, STORAGE_KEY }

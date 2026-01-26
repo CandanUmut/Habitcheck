@@ -1,5 +1,5 @@
 import { Entry } from '../lib/types'
-import { formatDate, getCalendarDays, isSameDay } from '../lib/date'
+import { formatDate, getCalendarDays, isSameDay } from '../lib/dates'
 
 type CalendarGridProps = {
   month: Date

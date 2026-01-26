@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, formatDate, getCalendarDays, lastNDays, parseDate } from './date'
+import { addDays, formatDate, getCalendarDays, lastNDays, parseDate } from './dates'
 
 describe('date helpers', () => {
   it('formats and parses dates', () => {

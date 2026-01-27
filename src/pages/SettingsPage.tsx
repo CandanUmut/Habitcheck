@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import Toggle from '../components/Toggle'
-import { AppSettings, Entry, ProtocolRun, Tracker } from '../lib/types'
+import { AppSettings, BadgesState, Entry, ProtocolRun, Tracker } from '../lib/types'
 import { createTracker, defaultSettings, exportData, importData, resetData } from '../lib/storage'
 import { todayString } from '../lib/dates'
+import { getGoalDefaults, goalModeOptions, getGoalUnitLabel } from '../lib/goals'
 
 type SettingsPageProps = {
   settings: AppSettings
@@ -14,6 +15,7 @@ type SettingsPageProps = {
   onUpdateEntries: (entries: Record<string, Entry[]>) => void
   onUpdateActiveTracker: (id: string) => void
   onUpdateProtocolRuns: (runs: ProtocolRun[]) => void
+  onUpdateBadges: (badges: BadgesState) => void
   onReplayOnboarding: () => void
 }
 
@@ -27,6 +29,7 @@ const SettingsPage = ({
   onUpdateEntries,
   onUpdateActiveTracker,
   onUpdateProtocolRuns,
+  onUpdateBadges,
   onReplayOnboarding
 }: SettingsPageProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -35,6 +38,19 @@ const SettingsPage = ({
     () => trackers.find((tracker) => tracker.id === activeTrackerId) ?? trackers[0],
     [trackers, activeTrackerId]
   )
+  const updateTracker = (updates: Partial<Tracker>) => {
+    if (!activeTracker) return
+    onUpdateTrackers(
+      trackers.map((tracker) =>
+        tracker.id === activeTracker.id
+          ? {
+              ...tracker,
+              ...updates
+            }
+          : tracker
+      )
+    )
+  }
 
   const handleExport = () => {
     const payload = exportData()
@@ -60,6 +76,7 @@ const SettingsPage = ({
         onUpdateEntries(imported.entries)
         onUpdateProtocolRuns(imported.protocolRuns)
         onUpdateActiveTracker(imported.activeTrackerId ?? imported.trackers[0]?.id ?? '')
+        onUpdateBadges(imported.badges)
         setImportError('')
       } catch {
         setImportError('That file does not look like a valid backup.')
@@ -77,6 +94,7 @@ const SettingsPage = ({
     onUpdateEntries({})
     onUpdateActiveTracker('')
     onUpdateProtocolRuns([])
+    onUpdateBadges({ global: [], trackers: {} })
   }
 
   const handleAddTracker = () => {
@@ -150,31 +168,71 @@ const SettingsPage = ({
             label="Daily reflection"
             description="Show a quick reflection prompt after you choose a color."
             checked={activeTracker.dailyQuestionEnabled}
-            onChange={(value) =>
-              onUpdateTrackers(
-                trackers.map((tracker) =>
-                  tracker.id === activeTracker.id ? { ...tracker, dailyQuestionEnabled: value } : tracker
-                )
-              )
-            }
+            onChange={(value) => updateTracker({ dailyQuestionEnabled: value })}
           />
           {activeTracker.dailyQuestionEnabled && (
             <label className="field">
               <span>Daily question text</span>
               <input
                 value={activeTracker.dailyQuestionText}
-                onChange={(event) =>
-                  onUpdateTrackers(
-                    trackers.map((tracker) =>
-                      tracker.id === activeTracker.id
-                        ? { ...tracker, dailyQuestionText: event.target.value }
-                        : tracker
-                    )
-                  )
-                }
+                onChange={(event) => updateTracker({ dailyQuestionText: event.target.value })}
               />
             </label>
           )}
+        </div>
+      )}
+
+      {activeTracker && (
+        <div className="card">
+          <h3>Goal targets</h3>
+          <p className="subtle">Pick one goal mode and set a simple weekly/monthly target.</p>
+          <label className="field">
+            <span>Goal mode</span>
+            <select
+              value={activeTracker.goalMode}
+              onChange={(event) => {
+                const nextMode = event.target.value as Tracker['goalMode']
+                const defaults = getGoalDefaults(nextMode)
+                updateTracker({
+                  goalMode: nextMode,
+                  weeklyTarget: defaults.weekly,
+                  monthlyTarget: defaults.monthly
+                })
+              }}
+            >
+              {goalModeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label} — {option.description}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="goal-inputs">
+            <label className="field">
+              <span>Weekly target ({getGoalUnitLabel(activeTracker.goalMode, true)})</span>
+              <input
+                type="number"
+                min={1}
+                value={activeTracker.weeklyTarget}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  updateTracker({ weeklyTarget: Number.isFinite(value) ? Math.max(1, value) : activeTracker.weeklyTarget })
+                }}
+              />
+            </label>
+            <label className="field">
+              <span>Monthly target ({getGoalUnitLabel(activeTracker.goalMode, true)})</span>
+              <input
+                type="number"
+                min={1}
+                value={activeTracker.monthlyTarget}
+                onChange={(event) => {
+                  const value = Number(event.target.value)
+                  updateTracker({ monthlyTarget: Number.isFinite(value) ? Math.max(1, value) : activeTracker.monthlyTarget })
+                }}
+              />
+            </label>
+          </div>
         </div>
       )}
 

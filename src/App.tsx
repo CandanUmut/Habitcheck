@@ -7,15 +7,20 @@ import InsightsPage from './pages/InsightsPage'
 import SettingsPage from './pages/SettingsPage'
 import OnboardingPage from './pages/OnboardingPage'
 import { createTracker, isOnboardingComplete, loadAppData, saveAppData, setOnboardingComplete } from './lib/storage'
-import { AppData, Entry, ProtocolRun, Status, Tracker } from './lib/types'
+import { AppData, Badge, Entry, ProtocolRun, Status, Tracker } from './lib/types'
 import { todayString } from './lib/dates'
 import AppIcon from './components/AppIcon'
+import { awardBadges, buildBadgeContext, getBadgeDefinitions } from './lib/badges'
+import BadgeCelebration from './components/BadgeCelebration'
+import { playBadgeSound } from './lib/sounds'
 
 const App = () => {
   const [data, setData] = useState<AppData>(() => loadAppData())
   const [page, setPage] = useState<PageKey>('home')
   const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingComplete())
   const [isOffline, setIsOffline] = useState(() => (typeof navigator !== 'undefined' ? !navigator.onLine : false))
+  const [badgeQueue, setBadgeQueue] = useState<Badge[]>([])
+  const [activeBadge, setActiveBadge] = useState<Badge | null>(null)
 
   useEffect(() => {
     saveAppData(data)
@@ -42,6 +47,26 @@ const App = () => {
     }
   }, [])
 
+  useEffect(() => {
+    if (!activeBadge && badgeQueue.length > 0) {
+      setActiveBadge(badgeQueue[0])
+      setBadgeQueue((prev) => prev.slice(1))
+    }
+  }, [activeBadge, badgeQueue])
+
+  useEffect(() => {
+    if (activeBadge && data.settings.soundsEnabled) {
+      playBadgeSound()
+    }
+  }, [activeBadge, data.settings.soundsEnabled])
+
+  useEffect(() => {
+    const { badges, newlyEarned } = syncBadges(data)
+    if (newlyEarned.length === 0) return
+    setData((prev) => ({ ...prev, badges }))
+    setBadgeQueue((prev) => [...prev, ...newlyEarned])
+  }, [data.entries, data.protocolRuns, data.trackers, data.badges])
+
   const trackers = data.trackers
   const activeTracker = useMemo(
     () => trackers.find((tracker) => tracker.id === data.activeTrackerId) ?? trackers[0],
@@ -49,6 +74,36 @@ const App = () => {
   )
   const activeTrackerId = activeTracker?.id
   const activeEntries = activeTrackerId ? data.entries[activeTrackerId] ?? [] : []
+
+  const syncBadges = (payload: AppData): { badges: AppData['badges']; newlyEarned: Badge[] } => {
+    const trackerDefinitions = getBadgeDefinitions('tracker')
+    const globalDefinitions = getBadgeDefinitions('global')
+    const newlyEarned: Badge[] = []
+    const nextTrackers = { ...payload.badges.trackers }
+
+    payload.trackers.forEach((tracker) => {
+      const entries = payload.entries[tracker.id] ?? []
+      const runs = payload.protocolRuns.filter((run) => run.trackerId === tracker.id)
+      const context = buildBadgeContext(entries, runs)
+      const earned = payload.badges.trackers[tracker.id] ?? []
+      const result = awardBadges(earned, trackerDefinitions, context)
+      nextTrackers[tracker.id] = result.updated
+      newlyEarned.push(...result.newlyEarned)
+    })
+
+    const allEntries = Object.values(payload.entries).flat()
+    const globalContext = buildBadgeContext(allEntries, payload.protocolRuns)
+    const globalResult = awardBadges(payload.badges.global ?? [], globalDefinitions, globalContext)
+    newlyEarned.push(...globalResult.newlyEarned)
+
+    return {
+      badges: {
+        global: globalResult.updated,
+        trackers: nextTrackers
+      },
+      newlyEarned
+    }
+  }
 
   const updateEntries = (trackerId: string, entries: Entry[]) => {
     setData((prev) => ({
@@ -159,7 +214,7 @@ const App = () => {
         <div className="brand">
           <AppIcon size={36} />
           <div>
-            <p className="brand-title">G/Y/R Daily Tracker</p>
+            <p className="brand-title">Habitcheck</p>
             <p className="brand-subtitle">Private • Offline-first</p>
           </div>
         </div>
@@ -194,9 +249,10 @@ const App = () => {
         {page === 'insights' && activeTracker && (
           <InsightsPage
             entries={activeEntries}
-            trackerName={activeTracker.name}
+            tracker={activeTracker}
             protocolRuns={data.protocolRuns}
             trackerId={activeTracker.id}
+            badges={data.badges}
           />
         )}
         {page === 'settings' && (
@@ -210,6 +266,7 @@ const App = () => {
             onUpdateEntries={(entries) => setData((prev) => ({ ...prev, entries }))}
             onUpdateActiveTracker={(id) => setData((prev) => ({ ...prev, activeTrackerId: id }))}
             onUpdateProtocolRuns={(runs) => setData((prev) => ({ ...prev, protocolRuns: runs }))}
+            onUpdateBadges={(badges) => setData((prev) => ({ ...prev, badges }))}
             onReplayOnboarding={() => {
               setOnboardingComplete(false)
               setShowOnboarding(true)
@@ -218,6 +275,7 @@ const App = () => {
         )}
       </main>
       <NavTabs active={page} onChange={setPage} />
+      {activeBadge && <BadgeCelebration badge={activeBadge} onClose={() => setActiveBadge(null)} />}
     </div>
   )
 }

@@ -88,8 +88,8 @@ const OnboardingPage = ({ tracker, onComplete, onSkip }: OnboardingPageProps) =>
       {step === 0 && (
         <div className="card onboarding-card">
           <AppIcon size={72} />
-          <h1>G/Y/R Daily Tracker</h1>
-          <p className="subtle">Track your goal daily with Green/Yellow/Red. Private. Simple.</p>
+          <h1>Habitcheck</h1>
+          <p className="subtle">Track your goal daily with three gentle statuses. Private. Simple.</p>
           <button type="button" className="primary" onClick={handleNext}>
             Get started
           </button>
@@ -143,16 +143,16 @@ const OnboardingPage = ({ tracker, onComplete, onSkip }: OnboardingPageProps) =>
           <h1>How to log</h1>
           <div className="status-explainer">
             <div>
-              <strong className="green">Green</strong>
+              <strong className="green">All good</strong>
               <p className="subtle">Aligned with my goal.</p>
             </div>
             <div>
-              <strong className="yellow">Yellow</strong>
-              <p className="subtle">Partial / risk day.</p>
+              <strong className="yellow">Mixed day</strong>
+              <p className="subtle">Some friction, still showing up.</p>
             </div>
             <div>
-              <strong className="red">Red</strong>
-              <p className="subtle">Off track day. Red is data, not shame.</p>
+              <strong className="red">Reset day</strong>
+              <p className="subtle">Not my day. Reset is data, not shame.</p>
             </div>
           </div>
           <div className="onboarding-actions">

@@ -5,7 +5,7 @@ type AppIconProps = {
   label?: string
 }
 
-const AppIcon = ({ size = 40, label = 'G/Y/R' }: AppIconProps) => {
+const AppIcon = ({ size = 40, label = 'HC' }: AppIconProps) => {
   const [hasError, setHasError] = useState(false)
 
   return (

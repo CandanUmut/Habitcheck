@@ -1,9 +1,10 @@
-import { Entry, Status } from './types'
+import { Entry, ProtocolRun, Status } from './types'
 import { formatDate, lastNDays, parseDate } from './dates'
 
 export const GREEN_POINTS = 3
 export const YELLOW_POINTS = 1
 export const RED_POINTS = 0
+export const RECOVERY_POINTS = 1
 export const CHAIN_BONUS_PER_DAY = 0.2
 export const CHAIN_BONUS_CAP = 3
 
@@ -40,14 +41,18 @@ const initCounts = (): SummaryCounts => ({ green: 0, yellow: 0, red: 0 })
 const mapEntries = (entries: Entry[]): Map<string, Entry> =>
   new Map(entries.map((entry) => [entry.date, entry]))
 
-const calculateRangeScore = (entries: Map<string, Entry>, days: Date[]) => {
+const getRecoveryDates = (runs: ProtocolRun[]): Set<string> =>
+  new Set(runs.filter((run) => run.completedAt).map((run) => run.date))
+
+const calculateRangeScore = (entries: Map<string, Entry>, days: Date[], recoveryDates = new Set<string>()) => {
   const counts = initCounts()
   let logged = 0
   let totalScore = 0
   let greenChain = 0
 
   days.forEach((day) => {
-    const entry = entries.get(formatDate(day))
+    const dayKey = formatDate(day)
+    const entry = entries.get(dayKey)
     if (!entry) {
       greenChain = 0
       return
@@ -61,6 +66,9 @@ const calculateRangeScore = (entries: Map<string, Entry>, days: Date[]) => {
     } else {
       greenChain = 0
       totalScore += statusPoints(entry.status)
+    }
+    if (recoveryDates.has(dayKey)) {
+      totalScore += RECOVERY_POINTS
     }
   })
 
@@ -131,12 +139,19 @@ const calculateStreaks = (entries: Entry[], today: Date) => {
   }
 }
 
-export const calculateDailyScores = (entries: Entry[], days: number, today = new Date()): number[] => {
+export const calculateDailyScores = (
+  entries: Entry[],
+  days: number,
+  today = new Date(),
+  protocolRuns: ProtocolRun[] = []
+): number[] => {
   const entryMap = mapEntries(entries)
   const range = lastNDays(days, today)
+  const recoveryDates = getRecoveryDates(protocolRuns)
   let greenChain = 0
   return range.map((day) => {
-    const entry = entryMap.get(formatDate(day))
+    const dayKey = formatDate(day)
+    const entry = entryMap.get(dayKey)
     if (!entry) {
       greenChain = 0
       return 0
@@ -144,20 +159,73 @@ export const calculateDailyScores = (entries: Entry[], days: number, today = new
     if (entry.status === 'green') {
       greenChain += 1
       const chainBonus = Math.min(greenChain * CHAIN_BONUS_PER_DAY, CHAIN_BONUS_CAP)
-      return Number((statusPoints(entry.status) + chainBonus).toFixed(1))
+      const total = statusPoints(entry.status) + chainBonus + (recoveryDates.has(dayKey) ? RECOVERY_POINTS : 0)
+      return Number(total.toFixed(1))
     }
     greenChain = 0
-    return statusPoints(entry.status)
+    const total = statusPoints(entry.status) + (recoveryDates.has(dayKey) ? RECOVERY_POINTS : 0)
+    return Number(total.toFixed(1))
   })
 }
 
-export const calculateStats = (entries: Entry[], today = new Date()): TrackerStats => {
+export const calculatePointsInRange = (
+  entries: Entry[],
+  protocolRuns: ProtocolRun[],
+  days: number,
+  today = new Date()
+): number => {
+  const entryMap = mapEntries(entries)
+  const range = lastNDays(days, today)
+  const recoveryDates = getRecoveryDates(protocolRuns)
+  return calculateRangeScore(entryMap, range, recoveryDates).totalScore
+}
+
+export const calculateTotalPoints = (entries: Entry[], protocolRuns: ProtocolRun[]): number => {
+  const recoveryDates = getRecoveryDates(protocolRuns)
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
+  let totalScore = 0
+  let greenChain = 0
+  let prevDate: Date | null = null
+  sorted.forEach((entry) => {
+    const entryDate = parseDate(entry.date)
+    if (prevDate) {
+      const expectedNext = new Date(prevDate)
+      expectedNext.setDate(expectedNext.getDate() + 1)
+      const isNextDay = entryDate.toDateString() === expectedNext.toDateString()
+      if (!isNextDay) {
+        greenChain = 0
+      }
+    }
+    if (entry.status === 'green') {
+      greenChain += 1
+      const chainBonus = Math.min(greenChain * CHAIN_BONUS_PER_DAY, CHAIN_BONUS_CAP)
+      totalScore += statusPoints(entry.status) + chainBonus
+    } else {
+      greenChain = 0
+      totalScore += statusPoints(entry.status)
+    }
+    if (recoveryDates.has(entry.date)) {
+      totalScore += RECOVERY_POINTS
+    }
+    prevDate = entryDate
+  })
+  return Number(totalScore.toFixed(1))
+}
+
+export const calculateStats = (
+  entries: Entry[],
+  protocolRunsOrToday: ProtocolRun[] | Date = [],
+  todayArg?: Date
+): TrackerStats => {
+  const protocolRuns = protocolRunsOrToday instanceof Date ? [] : protocolRunsOrToday
+  const today = protocolRunsOrToday instanceof Date ? protocolRunsOrToday : todayArg ?? new Date()
   const entryMap = mapEntries(entries)
   const last7Days = lastNDays(7, today)
   const last30Days = lastNDays(30, today)
+  const recoveryDates = getRecoveryDates(protocolRuns)
 
-  const last7Score = calculateRangeScore(entryMap, last7Days)
-  const last30Score = calculateRangeScore(entryMap, last30Days)
+  const last7Score = calculateRangeScore(entryMap, last7Days, recoveryDates)
+  const last30Score = calculateRangeScore(entryMap, last30Days, recoveryDates)
 
   const streaks = calculateStreaks(entries, today)
 
@@ -177,6 +245,74 @@ export const calculateStats = (entries: Entry[], today = new Date()): TrackerSta
     momentumMonthly: last30Score.totalScore,
     consistencyWeekly,
     consistencyMonthly,
-    dailyScores: calculateDailyScores(entries, 30, today)
+    dailyScores: calculateDailyScores(entries, 30, today, protocolRuns)
   }
+}
+
+export type GoalProgress = {
+  weekly: { current: number; target: number; remaining: number; percent: number }
+  monthly: { current: number; target: number; remaining: number; percent: number }
+}
+
+const clampPercent = (value: number): number => Math.max(0, Math.min(1, value))
+
+const getGoalValueForRange = (
+  entries: Entry[],
+  protocolRuns: ProtocolRun[],
+  days: number,
+  today: Date,
+  mode: 'consistency' | 'green' | 'points'
+): number => {
+  const entryMap = mapEntries(entries)
+  const range = lastNDays(days, today)
+  const recoveryDates = getRecoveryDates(protocolRuns)
+  const summary = calculateRangeScore(entryMap, range, recoveryDates)
+  if (mode === 'green') return summary.counts.green
+  if (mode === 'points') return summary.totalScore
+  return summary.logged
+}
+
+export const calculateGoalProgress = (
+  entries: Entry[],
+  protocolRuns: ProtocolRun[],
+  mode: 'consistency' | 'green' | 'points',
+  weeklyTarget: number,
+  monthlyTarget: number,
+  today: Date = new Date()
+): GoalProgress => {
+  const weeklyCurrent = getGoalValueForRange(entries, protocolRuns, 7, today, mode)
+  const monthlyCurrent = getGoalValueForRange(entries, protocolRuns, 30, today, mode)
+  const weeklyRemaining = Math.max(0, weeklyTarget - weeklyCurrent)
+  const monthlyRemaining = Math.max(0, monthlyTarget - monthlyCurrent)
+  return {
+    weekly: {
+      current: Number(weeklyCurrent.toFixed(1)),
+      target: weeklyTarget,
+      remaining: Number(weeklyRemaining.toFixed(1)),
+      percent: weeklyTarget ? clampPercent(weeklyCurrent / weeklyTarget) : 0
+    },
+    monthly: {
+      current: Number(monthlyCurrent.toFixed(1)),
+      target: monthlyTarget,
+      remaining: Number(monthlyRemaining.toFixed(1)),
+      percent: monthlyTarget ? clampPercent(monthlyCurrent / monthlyTarget) : 0
+    }
+  }
+}
+
+export const buildWeeklyGoalTimeline = (
+  entries: Entry[],
+  protocolRuns: ProtocolRun[],
+  mode: 'consistency' | 'green' | 'points',
+  weeks = 8,
+  today: Date = new Date()
+): number[] => {
+  const values: number[] = []
+  for (let i = weeks - 1; i >= 0; i -= 1) {
+    const endDate = new Date(today)
+    endDate.setDate(endDate.getDate() - i * 7)
+    const value = getGoalValueForRange(entries, protocolRuns, 7, endDate, mode)
+    values.push(Number(value.toFixed(1)))
+  }
+  return values
 }

@@ -1,5 +1,3 @@
-import { formatDate } from './dates'
-
 export const quotes = [
   'Small steps, repeated, become big change.',
   'A reset is not a failure. It’s a decision.',
@@ -27,24 +25,91 @@ export const quotes = [
   'A single log is a vote for your goal.',
   'Let the data guide you, not judge you.',
   'You are allowed to take breaks and return.',
-  'Soft progress is still progress.'
+  'Soft progress is still progress.',
+  'A mixed day still counts as showing up.',
+  'Resetting is a skill, not a setback.',
+  'One steady choice can shift the day.',
+  'Progress is built in the pauses.',
+  'Track the trend, not the mood.',
+  'Consistency is a kindness to yourself.',
+  'Your goal grows with every check-in.',
+  'A small return beats a big promise.'
 ]
 
-const hashString = (value: string): number => {
-  let hash = 0
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash * 31 + value.charCodeAt(i)) % 1_000_000_007
+export const QUOTE_BAG_KEY = 'tracker.v4.quoteBag'
+const HISTORY_LIMIT = 4
+
+type QuoteBagState = {
+  remaining: number[]
+  history: number[]
+}
+
+const safeJsonParse = <T>(value: string | null): T | null => {
+  if (!value) return null
+  try {
+    return JSON.parse(value) as T
+  } catch {
+    return null
   }
-  return Math.abs(hash)
 }
 
-export const getDailyQuote = (date: Date = new Date()): string => {
-  const seed = hashString(formatDate(date))
-  const index = seed % quotes.length
+export const createShuffledIndices = (count: number, random: () => number = Math.random): number[] => {
+  const indices = Array.from({ length: count }, (_, index) => index)
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1))
+    ;[indices[i], indices[j]] = [indices[j], indices[i]]
+  }
+  return indices
+}
+
+export const drawQuoteFromBag = (
+  state: QuoteBagState,
+  count: number,
+  random: () => number = Math.random
+): { index: number; nextState: QuoteBagState } => {
+  let remaining = [...state.remaining]
+  const history = [...state.history]
+  if (remaining.length === 0) {
+    remaining = createShuffledIndices(count, random)
+    if (history.length > 0 && remaining.length > 1 && remaining[0] === history[0]) {
+      ;[remaining[0], remaining[1]] = [remaining[1], remaining[0]]
+    }
+  }
+  const index = remaining.shift() ?? 0
+  const nextHistory = [index, ...history].slice(0, HISTORY_LIMIT)
+  return {
+    index,
+    nextState: {
+      remaining,
+      history: nextHistory
+    }
+  }
+}
+
+const loadQuoteBag = (): QuoteBagState => {
+  if (typeof window === 'undefined') {
+    return { remaining: createShuffledIndices(quotes.length), history: [] }
+  }
+  const stored = safeJsonParse<QuoteBagState>(localStorage.getItem(QUOTE_BAG_KEY))
+  if (!stored || !Array.isArray(stored.remaining) || !Array.isArray(stored.history)) {
+    return { remaining: createShuffledIndices(quotes.length), history: [] }
+  }
+  return {
+    remaining: stored.remaining.filter((value) => Number.isInteger(value) && value >= 0 && value < quotes.length),
+    history: stored.history.filter((value) => Number.isInteger(value) && value >= 0 && value < quotes.length)
+  }
+}
+
+const saveQuoteBag = (state: QuoteBagState): void => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(QUOTE_BAG_KEY, JSON.stringify(state))
+}
+
+export const getNextQuote = (random: () => number = Math.random): string => {
+  const state = loadQuoteBag()
+  const { index, nextState } = drawQuoteFromBag(state, quotes.length, random)
+  saveQuoteBag(nextState)
   return quotes[index]
 }
 
-export const getRandomQuote = (): string => {
-  const index = Math.floor(Math.random() * quotes.length)
-  return quotes[index]
-}
+export const getRandomQuote = (): string => getNextQuote()

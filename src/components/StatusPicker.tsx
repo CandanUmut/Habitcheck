@@ -1,10 +1,5 @@
 import { Status } from '../lib/types'
-
-const statusMeta: Record<Status, { title: string; subtitle: string }> = {
-  green: { title: 'Green', subtitle: 'On track and steady' },
-  yellow: { title: 'Yellow', subtitle: 'A softer day' },
-  red: { title: 'Red', subtitle: 'Needs care' }
-}
+import { statusMeta } from '../lib/status'
 
 type StatusPickerProps = {
   value: Status | null
@@ -21,8 +16,11 @@ const StatusPicker = ({ value, onChange, size = 'large' }: StatusPickerProps) =>
         className={`status-button ${status} ${value === status ? 'selected' : ''}`}
         onClick={() => onChange(status)}
       >
-        <span className="status-title">{statusMeta[status].title}</span>
-        <span className="status-subtitle">{statusMeta[status].subtitle}</span>
+        <span className="status-icon" aria-hidden>
+          {statusMeta[status].icon}
+        </span>
+        <span className="status-title">{statusMeta[status].label}</span>
+        <span className="status-subtitle">{statusMeta[status].helper}</span>
       </button>
     ))}
   </div>

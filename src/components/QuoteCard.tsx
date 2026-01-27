@@ -7,7 +7,7 @@ const QuoteCard = ({ quote, onNewQuote }: QuoteCardProps) => (
   <div className="card quote-card">
     <p className="quote-text">“{quote}”</p>
     <button type="button" className="ghost" onClick={onNewQuote}>
-      New quote
+      Tap for another quote
     </button>
   </div>
 )

@@ -66,3 +66,9 @@ export const playProtocolCompleteSound = (): void => {
     if (!played) playTone(720, 0.25, 0.06)
   })
 }
+
+export const playBadgeSound = (): void => {
+  void playAudioFile(soundMap.success).then((played) => {
+    if (!played) playTone(740, 0.2, 0.06)
+  })
+}

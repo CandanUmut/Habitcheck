@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['assets/app-icon.png', 'pwa/favicon-32x32.png', 'pwa/apple-touch-icon.png'],
       manifest: {
-        name: 'G/Y/R Daily Tracker',
-        short_name: 'G/Y/R Tracker',
+        name: 'Habitcheck',
+        short_name: 'Habitcheck',
         description: 'Private daily tracker with Green/Yellow/Red check-ins.',
         theme_color: '#0f172a',
         background_color: '#0f172a',

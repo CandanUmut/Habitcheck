@@ -4,18 +4,21 @@ import DonutChart from '../components/DonutChart'
 import LineChart from '../components/LineChart'
 import QuoteCard from '../components/QuoteCard'
 import StatsCards from '../components/StatsCards'
+import ProgressBar from '../components/ProgressBar'
 import { Entry, ProtocolRun, Status, Tracker } from '../lib/types'
 import { playStatusSound } from '../lib/sounds'
 import { todayString } from '../lib/dates'
-import { calculateStats } from '../lib/scoring'
-import { getDailyQuote, getRandomQuote } from '../lib/quotes'
+import { calculateGoalProgress, calculateStats } from '../lib/scoring'
+import { getNextQuote } from '../lib/quotes'
 import EmergencyProtocolModal from '../components/EmergencyProtocolModal'
 import { createProtocolRun } from '../lib/protocol'
+import { getGoalModeDescription, getGoalModeLabel, getGoalUnitLabel } from '../lib/goals'
+import { getStatusLabel, statusMeta } from '../lib/status'
 
 const celebrationCopy: Record<Status, { title: string; message: string }> = {
-  green: { title: 'Green logged!', message: 'You are building momentum.' },
-  yellow: { title: 'Yellow logged!', message: 'Showing up matters.' },
-  red: { title: 'Red logged!', message: 'Thanks for checking in. Be kind to yourself.' }
+  green: { title: 'All good logged!', message: 'You are building momentum.' },
+  yellow: { title: 'Mixed day logged!', message: 'Showing up matters.' },
+  red: { title: 'Reset day logged!', message: 'Thanks for checking in. Be kind to yourself.' }
 }
 
 type HomePageProps = {
@@ -44,16 +47,28 @@ const HomePage = ({
   const [status, setStatus] = useState<Status | null>(entry?.status ?? null)
   const [note, setNote] = useState(entry?.note ?? '')
   const [celebration, setCelebration] = useState<Status | null>(null)
-  const [quote, setQuote] = useState(() => getDailyQuote())
+  const [quote, setQuote] = useState(() => getNextQuote())
   const [protocolOpen, setProtocolOpen] = useState(false)
 
-  const stats = useMemo(() => calculateStats(entries), [entries])
-  const last7Summary = `${stats.last7.green}G ${stats.last7.yellow}Y ${stats.last7.red}R`
-  const last30Summary = `${stats.last30.green}G ${stats.last30.yellow}Y ${stats.last30.red}R`
-  const todayStatusLabel = entry ? entry.status.toUpperCase() : 'Not logged'
-  const protocolToday = protocolRuns.find(
-    (run) => run.trackerId === tracker.id && run.date === todayKey && run.completedAt
+  const trackerProtocolRuns = useMemo(
+    () => protocolRuns.filter((run) => run.trackerId === tracker.id),
+    [protocolRuns, tracker.id]
   )
+  const stats = useMemo(() => calculateStats(entries, trackerProtocolRuns), [entries, trackerProtocolRuns])
+  const goalProgress = useMemo(
+    () =>
+      calculateGoalProgress(
+        entries,
+        trackerProtocolRuns,
+        tracker.goalMode,
+        tracker.weeklyTarget,
+        tracker.monthlyTarget
+      ),
+    [entries, trackerProtocolRuns, tracker.goalMode, tracker.weeklyTarget, tracker.monthlyTarget]
+  )
+  const last7Summary = `All good ${stats.last7.green} • Mixed ${stats.last7.yellow} • Reset ${stats.last7.red}`
+  const todayStatusLabel = entry ? getStatusLabel(entry.status) : 'Not logged'
+  const protocolToday = trackerProtocolRuns.find((run) => run.date === todayKey && run.completedAt)
 
   useEffect(() => {
     setStatus(entry?.status ?? null)
@@ -86,16 +101,23 @@ const HomePage = ({
   }
 
   const handleNewQuote = () => {
-    setQuote(getRandomQuote())
+    setQuote(getNextQuote())
   }
 
-  const insightCards = [
-    { label: 'Green streak', value: stats.currentGreenStreak },
-    { label: '7-day log', value: last7Summary },
-    { label: '30-day log', value: last30Summary },
-    { label: 'Momentum (wk/mo)', value: `${stats.momentumWeekly} / ${stats.momentumMonthly}` },
-    { label: 'Today status', value: todayStatusLabel }
+  const progressCards = [
+    { label: 'All-good streak', value: stats.currentGreenStreak },
+    { label: 'Last 7 breakdown', value: last7Summary },
+    { label: 'Weekly points', value: `${stats.momentumWeekly} pts` }
   ]
+  const unitLabel = getGoalUnitLabel(tracker.goalMode)
+  const weeklyHelper =
+    goalProgress.weekly.remaining <= 0
+      ? 'Weekly goal hit 🎉'
+      : `${goalProgress.weekly.remaining} ${unitLabel} left to hit your weekly goal`
+  const monthlyHelper =
+    goalProgress.monthly.remaining <= 0
+      ? 'Monthly goal hit 🎉'
+      : `${goalProgress.monthly.remaining} ${unitLabel} left to hit your monthly goal`
 
   return (
     <section className="page">
@@ -105,13 +127,17 @@ const HomePage = ({
         <p className="subtle">Log today in under five seconds.</p>
       </header>
 
-      <div className="card logging-card">
-        {entry ? (
-          <div className={`today-status ${entry.status}`}>
-            <span>Today is already logged.</span>
-            <strong>{entry.status.toUpperCase()}</strong>
+      <div className="card logging-card hero-card">
+        <div className={`today-status ${entry?.status ?? 'pending'}`}>
+          <div>
+            <p className="subtle">Today’s check-in</p>
+            <strong>{entry ? todayStatusLabel : 'Not logged yet'}</strong>
           </div>
-        ) : (
+          <span className="today-icon" aria-hidden>
+            {entry ? statusMeta[entry.status].icon : '🗓️'}
+          </span>
+        </div>
+        {!entry && (
           <div className="nudge">
             <strong>Quick nudge:</strong> You have not logged today yet.
           </div>
@@ -129,20 +155,47 @@ const HomePage = ({
           </label>
         )}
         <button type="button" className="primary" onClick={handleSave} disabled={!status}>
-          Log today
+          Save today
         </button>
       </div>
 
+      <div className="card progress-card">
+        <div>
+          <h3>Today + Progress</h3>
+          <p className="subtle">
+            Goal mode: {getGoalModeLabel(tracker.goalMode)} · {getGoalModeDescription(tracker.goalMode)}
+          </p>
+        </div>
+        <div className="progress-grid">
+          <ProgressBar
+            label="Weekly target"
+            value={goalProgress.weekly.current}
+            target={goalProgress.weekly.target}
+            helper={weeklyHelper}
+            unit={getGoalUnitLabel(tracker.goalMode, true)}
+            accent="green"
+          />
+          <ProgressBar
+            label="Monthly target"
+            value={goalProgress.monthly.current}
+            target={goalProgress.monthly.target}
+            helper={monthlyHelper}
+            unit={getGoalUnitLabel(tracker.goalMode, true)}
+            accent="yellow"
+          />
+        </div>
+        <StatsCards items={progressCards} />
+      </div>
+
       <div className="card insights-card">
-        <h3>Key insights</h3>
-        <StatsCards items={insightCards} />
+        <h3>Mini trends</h3>
         <div className="insights-charts">
           <div className="chart-block">
             <p className="subtle">Last 7 days</p>
             <DonutChart counts={stats.last7} />
           </div>
           <div className="chart-block">
-            <p className="subtle">14-day momentum</p>
+            <p className="subtle">14-day points trend</p>
             <LineChart values={stats.dailyScores.slice(-14)} />
             <p className="subtle tiny">Trend updates with every log.</p>
           </div>
@@ -154,7 +207,7 @@ const HomePage = ({
       <div className="card action-card">
         <div>
           <h3>Emergency Protocol</h3>
-          <p className="subtle">When you feel a spike of risk, tap the protocol to reset.</p>
+          <p className="subtle">Use this gentle reset when you feel friction. It counts as a recovery point.</p>
           {protocolToday && <div className="badge">Protocol Save earned today</div>}
         </div>
         <button type="button" className="primary" onClick={() => setProtocolOpen(true)}>

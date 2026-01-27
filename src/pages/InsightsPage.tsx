@@ -1,11 +1,35 @@
 import DonutChart from '../components/DonutChart'
 import LineChart from '../components/LineChart'
 import StatsCards from '../components/StatsCards'
-import { Entry } from '../lib/types'
+import { Entry, ProtocolRun } from '../lib/types'
 import { calculateStats } from '../lib/scoring'
+import { formatDate, lastNDays } from '../lib/dates'
+import { getCompletedProtocolRunsInRange } from '../lib/protocol'
 
-const InsightsPage = ({ entries, trackerName }: { entries: Entry[]; trackerName: string }) => {
+const InsightsPage = ({
+  entries,
+  trackerName,
+  trackerId,
+  protocolRuns
+}: {
+  entries: Entry[]
+  trackerName: string
+  trackerId: string
+  protocolRuns: ProtocolRun[]
+}) => {
   const stats = calculateStats(entries)
+  const last30Days = lastNDays(30)
+  const last30Set = new Set(last30Days.map((date) => formatDate(date)))
+  const entriesLast30 = entries.filter((entry) => last30Set.has(entry.date))
+  const protocolRecent = getCompletedProtocolRunsInRange(protocolRuns, trackerId, 30)
+  const protocolDays = new Set(protocolRecent.map((run) => run.date))
+  const protocolEntries = entriesLast30.filter((entry) => protocolDays.has(entry.date))
+  const totalRedRate = entriesLast30.length
+    ? Math.round((entriesLast30.filter((entry) => entry.status === 'red').length / entriesLast30.length) * 100)
+    : 0
+  const protocolRedRate = protocolEntries.length
+    ? Math.round((protocolEntries.filter((entry) => entry.status === 'red').length / protocolEntries.length) * 100)
+    : 0
 
   return (
     <section className="page">
@@ -40,6 +64,24 @@ const InsightsPage = ({ entries, trackerName }: { entries: Entry[]; trackerName:
             { label: 'Completion rate', value: `${stats.consistencyMonthly}%` }
           ]}
         />
+      </div>
+
+      <div className="card">
+        <h3>Emergency Protocol</h3>
+        <StatsCards
+          items={[
+            { label: 'Used last 30 days', value: protocolRecent.length },
+            { label: 'Protocol days logged', value: protocolEntries.length }
+          ]}
+        />
+        {protocolRecent.length > 0 ? (
+          <p className="subtle">
+            Protocol days were red {protocolRedRate}% of the time vs {totalRedRate}% overall. Every run
+            is a step toward steadier days.
+          </p>
+        ) : (
+          <p className="subtle">Use the protocol when you need a reset. It will show up here.</p>
+        )}
       </div>
 
       <div className="card">

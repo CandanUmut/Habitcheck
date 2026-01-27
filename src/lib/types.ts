@@ -14,6 +14,16 @@ export type Tracker = {
   dailyQuestionText: string
 }
 
+export type ProtocolRun = {
+  id: string
+  trackerId: string
+  date: string
+  startedAt: number
+  completedAt?: number
+  completedSteps: number
+  durationMinutes: number
+}
+
 export type AppSettings = {
   soundsEnabled: boolean
   theme: 'light' | 'dark'
@@ -21,9 +31,10 @@ export type AppSettings = {
 }
 
 export type AppData = {
-  version: 2
+  version: 3
   settings: AppSettings
   trackers: Tracker[]
   entries: Record<string, Entry[]>
   activeTrackerId?: string
+  protocolRuns: ProtocolRun[]
 }

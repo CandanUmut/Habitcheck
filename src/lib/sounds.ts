@@ -19,14 +19,50 @@ const playTone = (frequency: number, duration = 0.2, volume = 0.05) => {
   }
 }
 
+const soundMap: Record<string, string> = {
+  success: '/assets/sounds/success.mp3',
+  neutral: '/assets/sounds/neutral.mp3',
+  alert: '/assets/sounds/gentle-alert.mp3',
+  complete: '/assets/sounds/complete.mp3'
+}
+
+const playAudioFile = async (path: string): Promise<boolean> => {
+  if (typeof window === 'undefined') return false
+  try {
+    const audio = new Audio(path)
+    await audio.play()
+    return true
+  } catch {
+    return false
+  }
+}
+
 export const playStatusSound = (status: Status): void => {
   if (status === 'green') {
-    playTone(660, 0.18, 0.06)
+    void playAudioFile(soundMap.success).then((played) => {
+      if (!played) playTone(660, 0.18, 0.06)
+    })
     return
   }
   if (status === 'yellow') {
-    playTone(440, 0.2, 0.05)
+    void playAudioFile(soundMap.neutral).then((played) => {
+      if (!played) playTone(440, 0.2, 0.05)
+    })
     return
   }
-  playTone(220, 0.25, 0.05)
+  void playAudioFile(soundMap.alert).then((played) => {
+    if (!played) playTone(220, 0.25, 0.05)
+  })
+}
+
+export const playEmergencyStartSound = (): void => {
+  void playAudioFile(soundMap.alert).then((played) => {
+    if (!played) playTone(260, 0.25, 0.05)
+  })
+}
+
+export const playProtocolCompleteSound = (): void => {
+  void playAudioFile(soundMap.complete).then((played) => {
+    if (!played) playTone(720, 0.25, 0.06)
+  })
 }

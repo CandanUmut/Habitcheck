@@ -19,11 +19,13 @@ const playTone = (frequency: number, duration = 0.2, volume = 0.05) => {
   }
 }
 
+const baseUrl = import.meta.env.BASE_URL
+
 const soundMap: Record<string, string> = {
-  success: '/assets/sounds/success.mp3',
-  neutral: '/assets/sounds/neutral.mp3',
-  alert: '/assets/sounds/gentle-alert.mp3',
-  complete: '/assets/sounds/complete.mp3'
+  success: `${baseUrl}assets/sounds/success.mp3`,
+  neutral: `${baseUrl}assets/sounds/neutral.mp3`,
+  alert: `${baseUrl}assets/sounds/gentle-alert.mp3`,
+  complete: `${baseUrl}assets/sounds/complete.mp3`
 }
 
 const playAudioFile = async (path: string): Promise<boolean> => {

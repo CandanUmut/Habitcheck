@@ -17,7 +17,17 @@ export const quotes = [
   'Every streak begins with one logged day.',
   'You did not fail—you gathered data.',
   'Breathe, reset, continue.',
-  'A calm return beats a perfect start.'
+  'A calm return beats a perfect start.',
+  'Steady is a strategy.',
+  'Choose the next helpful step.',
+  'Your future self notices your effort.',
+  'Small changes compound quietly.',
+  'Kindness keeps you moving.',
+  'You can be imperfect and consistent.',
+  'A single log is a vote for your goal.',
+  'Let the data guide you, not judge you.',
+  'You are allowed to take breaks and return.',
+  'Soft progress is still progress.'
 ]
 
 const hashString = (value: string): number => {

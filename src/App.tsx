@@ -6,13 +6,16 @@ import HistoryPage from './pages/HistoryPage'
 import InsightsPage from './pages/InsightsPage'
 import SettingsPage from './pages/SettingsPage'
 import OnboardingPage from './pages/OnboardingPage'
-import { createTracker, loadAppData, saveAppData } from './lib/storage'
-import { AppData, Entry, Status, Tracker } from './lib/types'
+import { createTracker, isOnboardingComplete, loadAppData, saveAppData, setOnboardingComplete } from './lib/storage'
+import { AppData, Entry, ProtocolRun, Status, Tracker } from './lib/types'
 import { todayString } from './lib/dates'
+import AppIcon from './components/AppIcon'
 
 const App = () => {
   const [data, setData] = useState<AppData>(() => loadAppData())
   const [page, setPage] = useState<PageKey>('home')
+  const [showOnboarding, setShowOnboarding] = useState(() => !isOnboardingComplete())
+  const [isOffline, setIsOffline] = useState(() => (typeof navigator !== 'undefined' ? !navigator.onLine : false))
 
   useEffect(() => {
     saveAppData(data)
@@ -21,6 +24,23 @@ const App = () => {
   useEffect(() => {
     document.documentElement.dataset.theme = data.settings.theme
   }, [data.settings.theme])
+
+  useEffect(() => {
+    if (data.trackers.length > 0 && !isOnboardingComplete()) {
+      setOnboardingComplete(true)
+      setShowOnboarding(false)
+    }
+  }, [data.trackers.length])
+
+  useEffect(() => {
+    const handleStatus = () => setIsOffline(typeof navigator !== 'undefined' && !navigator.onLine)
+    window.addEventListener('online', handleStatus)
+    window.addEventListener('offline', handleStatus)
+    return () => {
+      window.removeEventListener('online', handleStatus)
+      window.removeEventListener('offline', handleStatus)
+    }
+  }, [])
 
   const trackers = data.trackers
   const activeTracker = useMemo(
@@ -62,6 +82,28 @@ const App = () => {
     })
   }
 
+  const addProtocolRun = (run: ProtocolRun) => {
+    setData((prev) => ({
+      ...prev,
+      protocolRuns: [...prev.protocolRuns, run]
+    }))
+  }
+
+  const completeProtocolRun = (runId: string, completedSteps: number) => {
+    setData((prev) => ({
+      ...prev,
+      protocolRuns: prev.protocolRuns.map((run) =>
+        run.id === runId
+          ? {
+              ...run,
+              completedSteps,
+              completedAt: Date.now()
+            }
+          : run
+      )
+    }))
+  }
+
   const handleAddTracker = () => {
     const name = window.prompt('Name your tracker')?.trim()
     if (!name) return
@@ -74,23 +116,55 @@ const App = () => {
     }))
   }
 
-  if (trackers.length === 0) {
+  if (trackers.length === 0 || showOnboarding) {
     return (
       <OnboardingPage
-        onComplete={(tracker: Tracker) =>
-          setData((prev) => ({
-            ...prev,
-            trackers: [tracker],
-            entries: { ...prev.entries, [tracker.id]: [] },
-            activeTrackerId: tracker.id
-          }))
-        }
+        tracker={activeTracker}
+        onSkip={() => {
+          if (trackers.length === 0) {
+            const tracker = createTracker('My goal')
+            setData((prev) => ({
+              ...prev,
+              trackers: [tracker],
+              entries: { ...prev.entries, [tracker.id]: [] },
+              activeTrackerId: tracker.id
+            }))
+          }
+          setOnboardingComplete(true)
+          setShowOnboarding(false)
+        }}
+        onComplete={(tracker: Tracker) => {
+          setData((prev) => {
+            const hasTracker = prev.trackers.find((item) => item.id === tracker.id)
+            const nextTrackers = hasTracker
+              ? prev.trackers.map((item) => (item.id === tracker.id ? tracker : item))
+              : [tracker]
+            return {
+              ...prev,
+              trackers: nextTrackers,
+              entries: hasTracker ? prev.entries : { ...prev.entries, [tracker.id]: [] },
+              activeTrackerId: tracker.id
+            }
+          })
+          setOnboardingComplete(true)
+          setShowOnboarding(false)
+        }}
       />
     )
   }
 
   return (
     <div className="app">
+      <header className="app-header">
+        <div className="brand">
+          <AppIcon size={36} />
+          <div>
+            <p className="brand-title">G/Y/R Daily Tracker</p>
+            <p className="brand-subtitle">Private • Offline-first</p>
+          </div>
+        </div>
+        {isOffline && <span className="offline-pill">Offline mode</span>}
+      </header>
       <main className="content">
         <TrackerTabs
           trackers={trackers}
@@ -102,8 +176,11 @@ const App = () => {
           <HomePage
             tracker={activeTracker}
             entries={activeEntries}
+            protocolRuns={data.protocolRuns}
             settings={data.settings}
             onSave={(status, note) => updateEntry(activeTracker.id, todayString(), status, note)}
+            onStartProtocol={addProtocolRun}
+            onCompleteProtocol={completeProtocolRun}
             isActive={page === 'home'}
           />
         )}
@@ -115,7 +192,12 @@ const App = () => {
           />
         )}
         {page === 'insights' && activeTracker && (
-          <InsightsPage entries={activeEntries} trackerName={activeTracker.name} />
+          <InsightsPage
+            entries={activeEntries}
+            trackerName={activeTracker.name}
+            protocolRuns={data.protocolRuns}
+            trackerId={activeTracker.id}
+          />
         )}
         {page === 'settings' && (
           <SettingsPage
@@ -127,6 +209,11 @@ const App = () => {
             onUpdateTrackers={(nextTrackers) => setData((prev) => ({ ...prev, trackers: nextTrackers }))}
             onUpdateEntries={(entries) => setData((prev) => ({ ...prev, entries }))}
             onUpdateActiveTracker={(id) => setData((prev) => ({ ...prev, activeTrackerId: id }))}
+            onUpdateProtocolRuns={(runs) => setData((prev) => ({ ...prev, protocolRuns: runs }))}
+            onReplayOnboarding={() => {
+              setOnboardingComplete(false)
+              setShowOnboarding(true)
+            }}
           />
         )}
       </main>

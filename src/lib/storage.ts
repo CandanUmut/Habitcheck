@@ -1,8 +1,10 @@
-import { AppData, AppSettings, Entry, Tracker } from './types'
+import { AppData, AppSettings, Entry, ProtocolRun, Tracker } from './types'
 
-const STORAGE_KEY = 'tracker.v2.data'
+const STORAGE_KEY = 'tracker.v3.data'
+const LEGACY_V2_KEY = 'tracker.v2.data'
 const LEGACY_SETTINGS_KEY = 'tracker.v1.settings'
 const LEGACY_ENTRIES_KEY = 'tracker.v1.entries'
+const ONBOARDING_KEY = 'tracker.onboardingCompleted'
 
 const defaultSettings: AppSettings = {
   soundsEnabled: true,
@@ -76,6 +78,21 @@ const ensureEntriesMap = (input: Record<string, Entry[]> | null): Record<string,
   )
 }
 
+const ensureProtocolRuns = (input: ProtocolRun[] | null): ProtocolRun[] => {
+  if (!Array.isArray(input)) return []
+  return input
+    .filter((run) => run && typeof run.trackerId === 'string' && typeof run.startedAt === 'number')
+    .map((run) => ({
+      id: typeof run.id === 'string' ? run.id : generateId(),
+      trackerId: run.trackerId,
+      date: typeof run.date === 'string' ? run.date : new Date(run.startedAt).toISOString().slice(0, 10),
+      startedAt: run.startedAt,
+      completedAt: typeof run.completedAt === 'number' ? run.completedAt : undefined,
+      completedSteps: typeof run.completedSteps === 'number' ? run.completedSteps : 0,
+      durationMinutes: typeof run.durationMinutes === 'number' ? run.durationMinutes : 10
+    }))
+}
+
 const migrateLegacyData = (): AppData => {
   const legacySettings = safeJsonParse<{
     goalName?: string
@@ -89,11 +106,12 @@ const migrateLegacyData = (): AppData => {
 
   if (!trackerName && (!legacyEntries || legacyEntries.length === 0)) {
     return {
-      version: 2,
+      version: 3,
       settings: ensureSettings({ soundsEnabled: legacySettings?.soundsEnabled, theme: legacySettings?.theme }),
       trackers: [],
       entries: {},
-      activeTrackerId: undefined
+      activeTrackerId: undefined,
+      protocolRuns: []
     }
   }
 
@@ -106,36 +124,59 @@ const migrateLegacyData = (): AppData => {
   }
 
   return {
-    version: 2,
+    version: 3,
     settings: ensureSettings({ soundsEnabled: legacySettings?.soundsEnabled, theme: legacySettings?.theme }),
     trackers: [tracker],
     entries: {
       [tracker.id]: ensureEntries(legacyEntries ?? null)
     },
-    activeTrackerId: tracker.id
+    activeTrackerId: tracker.id,
+    protocolRuns: []
   }
 }
 
 const ensureAppData = (input: AppData | null): AppData => {
-  if (!input || input.version !== 2) return migrateLegacyData()
+  if (!input) return migrateLegacyData()
+  if (input.version === 2) {
+    return {
+      version: 3,
+      settings: ensureSettings(input.settings ?? null),
+      trackers: ensureTrackers(input.trackers ?? []),
+      entries: ensureEntriesMap(input.entries ?? {}),
+      activeTrackerId:
+        typeof input.activeTrackerId === 'string' ? input.activeTrackerId : input.trackers?.[0]?.id,
+      protocolRuns: []
+    }
+  }
+  if (input.version !== 3) return migrateLegacyData()
   const trackers = ensureTrackers(input.trackers ?? [])
   const entries = ensureEntriesMap(input.entries ?? {})
   const activeTrackerId = typeof input.activeTrackerId === 'string' ? input.activeTrackerId : trackers[0]?.id
   return {
-    version: 2,
+    version: 3,
     settings: ensureSettings(input.settings ?? null),
     trackers,
     entries,
-    activeTrackerId
+    activeTrackerId,
+    protocolRuns: ensureProtocolRuns(input.protocolRuns ?? null)
   }
 }
 
 export const loadAppData = (): AppData => {
   if (typeof window === 'undefined') {
-    return { version: 2, settings: { ...defaultSettings }, trackers: [], entries: {}, activeTrackerId: undefined }
+    return {
+      version: 3,
+      settings: { ...defaultSettings },
+      trackers: [],
+      entries: {},
+      activeTrackerId: undefined,
+      protocolRuns: []
+    }
   }
   const raw = safeJsonParse<AppData>(localStorage.getItem(STORAGE_KEY))
-  return ensureAppData(raw)
+  if (raw) return ensureAppData(raw)
+  const legacyRaw = safeJsonParse<AppData>(localStorage.getItem(LEGACY_V2_KEY))
+  return ensureAppData(legacyRaw)
 }
 
 export const saveAppData = (data: AppData): void => {
@@ -154,6 +195,7 @@ export const importData = (payload: AppData): AppData => {
 export const resetData = (): void => {
   if (typeof window === 'undefined') return
   localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(LEGACY_V2_KEY)
 }
 
 export const createTracker = (name: string): Tracker => ({
@@ -162,5 +204,15 @@ export const createTracker = (name: string): Tracker => ({
   dailyQuestionEnabled: false,
   dailyQuestionText: defaultTrackerQuestion
 })
+
+export const isOnboardingComplete = (): boolean => {
+  if (typeof window === 'undefined') return true
+  return localStorage.getItem(ONBOARDING_KEY) === 'true'
+}
+
+export const setOnboardingComplete = (value: boolean): void => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(ONBOARDING_KEY, String(value))
+}
 
 export { defaultSettings, STORAGE_KEY }

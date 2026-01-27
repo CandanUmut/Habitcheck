@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import Toggle from '../components/Toggle'
-import { AppSettings, Entry, Tracker } from '../lib/types'
+import { AppSettings, Entry, ProtocolRun, Tracker } from '../lib/types'
 import { createTracker, defaultSettings, exportData, importData, resetData } from '../lib/storage'
 import { todayString } from '../lib/dates'
 
@@ -13,6 +13,8 @@ type SettingsPageProps = {
   onUpdateTrackers: (trackers: Tracker[]) => void
   onUpdateEntries: (entries: Record<string, Entry[]>) => void
   onUpdateActiveTracker: (id: string) => void
+  onUpdateProtocolRuns: (runs: ProtocolRun[]) => void
+  onReplayOnboarding: () => void
 }
 
 const SettingsPage = ({
@@ -23,7 +25,9 @@ const SettingsPage = ({
   onUpdateSettings,
   onUpdateTrackers,
   onUpdateEntries,
-  onUpdateActiveTracker
+  onUpdateActiveTracker,
+  onUpdateProtocolRuns,
+  onReplayOnboarding
 }: SettingsPageProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [importError, setImportError] = useState('')
@@ -54,6 +58,7 @@ const SettingsPage = ({
         onUpdateSettings(imported.settings)
         onUpdateTrackers(imported.trackers)
         onUpdateEntries(imported.entries)
+        onUpdateProtocolRuns(imported.protocolRuns)
         onUpdateActiveTracker(imported.activeTrackerId ?? imported.trackers[0]?.id ?? '')
         setImportError('')
       } catch {
@@ -71,6 +76,7 @@ const SettingsPage = ({
     onUpdateTrackers([])
     onUpdateEntries({})
     onUpdateActiveTracker('')
+    onUpdateProtocolRuns([])
   }
 
   const handleAddTracker = () => {
@@ -194,6 +200,14 @@ const SettingsPage = ({
           checked={settings.theme === 'dark'}
           onChange={(value) => onUpdateSettings({ ...settings, theme: value ? 'dark' : 'light' })}
         />
+      </div>
+
+      <div className="card">
+        <h3>Onboarding</h3>
+        <p className="subtle">Replay the intro walkthrough if you want a quick refresher.</p>
+        <button type="button" className="ghost" onClick={onReplayOnboarding}>
+          Replay onboarding
+        </button>
       </div>
 
       <div className="card">

@@ -7,6 +7,7 @@ type AppIconProps = {
 
 const AppIcon = ({ size = 40, label = 'HC' }: AppIconProps) => {
   const [hasError, setHasError] = useState(false)
+  const baseUrl = import.meta.env.BASE_URL
 
   return (
     <div className="app-icon" style={{ width: size, height: size }}>
@@ -16,7 +17,7 @@ const AppIcon = ({ size = 40, label = 'HC' }: AppIconProps) => {
         </span>
       ) : (
         <img
-          src="/assets/app-icon.png"
+          src={`${baseUrl}assets/app-icon.png`}
           alt="App icon"
           width={size}
           height={size}

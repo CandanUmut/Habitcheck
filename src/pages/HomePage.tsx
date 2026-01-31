@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import StatusPicker from '../components/StatusPicker'
 import DonutChart from '../components/DonutChart'
 import LineChart from '../components/LineChart'
@@ -14,6 +14,7 @@ import EmergencyProtocolModal from '../components/EmergencyProtocolModal'
 import { createProtocolRun } from '../lib/protocol'
 import { getGoalModeDescription, getGoalModeLabel, getGoalUnitLabel } from '../lib/goals'
 import { getStatusLabel, statusMeta } from '../lib/status'
+import StickyLogBar from '../components/StickyLogBar'
 
 const celebrationCopy: Record<Status, { title: string; message: string }> = {
   green: { title: 'All good logged!', message: 'You are building momentum.' },
@@ -49,6 +50,11 @@ const HomePage = ({
   const [celebration, setCelebration] = useState<Status | null>(null)
   const [quote, setQuote] = useState(() => getNextQuote())
   const [protocolOpen, setProtocolOpen] = useState(false)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [savedAt, setSavedAt] = useState<number | null>(entry?.updatedAt ?? null)
+  const [showSavedToast, setShowSavedToast] = useState(false)
+  const toastTimeoutRef = useRef<number | null>(null)
+  const lastSavedRef = useRef<{ status: Status; note: string } | null>(null)
 
   const trackerProtocolRuns = useMemo(
     () => protocolRuns.filter((run) => run.trackerId === tracker.id),
@@ -69,36 +75,77 @@ const HomePage = ({
   const last7Summary = `All good ${stats.last7.green} • Mixed ${stats.last7.yellow} • Reset ${stats.last7.red}`
   const todayStatusLabel = entry ? getStatusLabel(entry.status) : 'Not logged'
   const protocolToday = trackerProtocolRuns.find((run) => run.date === todayKey && run.completedAt)
+  const lastSavedLabel = savedAt
+    ? `Saved ${new Date(savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : 'Not saved yet'
 
   useEffect(() => {
     setStatus(entry?.status ?? null)
     setNote(entry?.note ?? '')
-  }, [entry?.status, entry?.note])
+    setSavedAt(entry?.updatedAt ?? null)
+    if (entry?.status) {
+      lastSavedRef.current = { status: entry.status, note: entry.note?.trim() ?? '' }
+    } else {
+      lastSavedRef.current = null
+    }
+  }, [entry?.status, entry?.note, entry?.updatedAt])
 
   useEffect(() => {
     if (!isActive) return
     const handler = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
-      if (key === 'g') setStatus('green')
-      if (key === 'y') setStatus('yellow')
-      if (key === 'r') setStatus('red')
+      if (key === 'g') handleStatusSelect('green')
+      if (key === 'y') handleStatusSelect('yellow')
+      if (key === 'r') handleStatusSelect('red')
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [isActive])
+  }, [isActive, handleStatusSelect])
 
-  const handleSave = () => {
+  const triggerSavedToast = useCallback((timestamp: number) => {
+    setSavedAt(timestamp)
+    setShowSavedToast(true)
+    if (toastTimeoutRef.current) {
+      window.clearTimeout(toastTimeoutRef.current)
+    }
+    toastTimeoutRef.current = window.setTimeout(() => setShowSavedToast(false), 1600)
+  }, [])
+
+  const commitSave = useCallback(
+    (nextStatus: Status, nextNote: string, timestamp = Date.now()) => {
+      onSave(nextStatus, nextNote)
+      lastSavedRef.current = { status: nextStatus, note: nextNote.trim() }
+      triggerSavedToast(timestamp)
+    },
+    [onSave, triggerSavedToast]
+  )
+
+  const handleStatusSelect = useCallback(
+    (nextStatus: Status) => {
+      setStatus(nextStatus)
+      commitSave(nextStatus, note)
+      if (settings.soundsEnabled) {
+        playStatusSound(nextStatus)
+      }
+      if (settings.hapticsEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(nextStatus === 'red' ? 80 : 40)
+      }
+      setCelebration(nextStatus)
+      window.setTimeout(() => setCelebration(null), 1500)
+    },
+    [commitSave, note, settings.hapticsEnabled, settings.soundsEnabled]
+  )
+
+  useEffect(() => {
     if (!status) return
-    onSave(status, note)
-    if (settings.soundsEnabled) {
-      playStatusSound(status)
-    }
-    if (settings.hapticsEnabled && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      navigator.vibrate(status === 'red' ? 80 : 40)
-    }
-    setCelebration(status)
-    window.setTimeout(() => setCelebration(null), 1800)
-  }
+    const trimmedNote = note.trim()
+    const lastSaved = lastSavedRef.current
+    if (lastSaved && lastSaved.status === status && lastSaved.note === trimmedNote) return
+    const timeout = window.setTimeout(() => {
+      commitSave(status, note)
+    }, 650)
+    return () => window.clearTimeout(timeout)
+  }, [note, status])
 
   const handleNewQuote = () => {
     setQuote(getNextQuote())
@@ -125,6 +172,7 @@ const HomePage = ({
         <p className="eyebrow">Today</p>
         <h1>{tracker.name}</h1>
         <p className="subtle">Log today in under five seconds.</p>
+        <span className={`status-chip ${entry?.status ?? 'pending'}`}>Today: {todayStatusLabel}</span>
       </header>
 
       <div className="card logging-card hero-card">
@@ -142,21 +190,35 @@ const HomePage = ({
             <strong>Quick nudge:</strong> You have not logged today yet.
           </div>
         )}
-        <StatusPicker value={status} onChange={setStatus} size="large" />
+        <div className="log-today">
+          <StatusPicker value={status} onChange={handleStatusSelect} size="large" requireHoldForRed />
+          <div className="saved-row">
+            <span className="saved-meta">{lastSavedLabel}</span>
+            {showSavedToast && <span className="saved-toast">Saved ✓</span>}
+          </div>
+        </div>
         {tracker.dailyQuestionEnabled && (
-          <label className="field">
-            <span>{tracker.dailyQuestionText}</span>
-            <textarea
-              rows={3}
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="A quick note..."
-            />
-          </label>
+          <div className="daily-question">
+            <button
+              type="button"
+              className="ghost note-toggle"
+              onClick={() => setNoteOpen((prev) => !prev)}
+            >
+              {noteOpen ? 'Hide note' : 'Add note'}
+            </button>
+            {noteOpen && (
+              <label className="field">
+                <span>{tracker.dailyQuestionText}</span>
+                <textarea
+                  rows={3}
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                  placeholder="A quick note..."
+                />
+              </label>
+            )}
+          </div>
         )}
-        <button type="button" className="primary" onClick={handleSave} disabled={!status}>
-          Save today
-        </button>
       </div>
 
       <div className="card progress-card">
@@ -234,6 +296,7 @@ const HomePage = ({
         hapticsEnabled={settings.hapticsEnabled}
         createRun={createProtocolRun}
       />
+      <StickyLogBar status={status} onSelect={handleStatusSelect} savedAt={savedAt} />
     </section>
   )
 }

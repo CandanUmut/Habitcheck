@@ -3,6 +3,7 @@ import CalendarGrid from '../components/CalendarGrid'
 import StatusPicker from '../components/StatusPicker'
 import { Entry, Status } from '../lib/types'
 import { formatDate, todayString } from '../lib/dates'
+import { getStatusLabel } from '../lib/status'
 
 type HistoryPageProps = {
   entries: Entry[]
@@ -18,6 +19,10 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
 
   const selectedKey = formatDate(selectedDate)
   const selectedEntry = entries.find((entry) => entry.date === selectedKey)
+  const selectedStatusLabel = selectedEntry ? getStatusLabel(selectedEntry.status) : 'Not logged'
+  const lastSavedLabel = selectedEntry?.updatedAt
+    ? `Saved ${new Date(selectedEntry.updatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : 'Not saved yet'
 
   useEffect(() => {
     setStatus(selectedEntry?.status ?? null)
@@ -73,8 +78,16 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
       />
 
       <div className="card">
-        <h3>{selectedKey === todayString() ? 'Today' : selectedKey}</h3>
-        <StatusPicker value={status} onChange={setStatus} size="medium" />
+        <div className="history-header">
+          <div>
+            <h3>{selectedKey === todayString() ? 'Today' : selectedKey}</h3>
+            <span className={`status-chip ${selectedEntry?.status ?? 'pending'}`}>
+              {selectedKey === todayString() ? 'Today' : 'Selected'}: {selectedStatusLabel}
+            </span>
+          </div>
+          <span className="saved-meta">{lastSavedLabel}</span>
+        </div>
+        <StatusPicker value={status} onChange={setStatus} size="medium" requireHoldForRed />
         <label className="field">
           <span>Optional note</span>
           <textarea

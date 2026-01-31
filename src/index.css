@@ -817,8 +817,45 @@ h4 {
   gap: 12px;
 }
 
-.note-toggle {
-  align-self: flex-start;
+.note-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.note-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+
+.note-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+
+.note-meta {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .today-status {
@@ -1141,34 +1178,16 @@ h4 {
   flex-wrap: wrap;
 }
 
-.sticky-log-bar {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(900px, calc(100% - 32px));
-  bottom: 96px;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 14px;
-  box-shadow: var(--shadow);
+.note-editor {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  z-index: 15;
 }
 
-.sticky-log-header {
+.note-actions {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-}
-
-.sticky-log-title {
-  font-weight: 700;
-  margin: 0 0 6px;
 }
 
 .badge {
@@ -1393,9 +1412,5 @@ h4 {
 
   .nav-tabs {
     position: sticky;
-  }
-
-  .sticky-log-bar {
-    bottom: 24px;
   }
 }

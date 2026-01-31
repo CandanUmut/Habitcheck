@@ -31,6 +31,11 @@ npm run build
 npm run preview
 ```
 
+### Crash hotfix note
+- Root cause: a circular import / initialization order issue could surface in the minified bundle, producing a `ReferenceError: Cannot access 'F' before initialization`.
+- Fix: shared status types and helpers live in `src/lib/status.ts` (a neutral module), and runtime PWA recovery now prompts refresh if a mismatched build or repeated startup crash is detected.
+- Recovery: if you still see a white screen after an update, hard-refresh (or clear the site’s service worker in Application → Service Workers) to fetch the new bundle.
+
 ## Privacy
 All data is stored locally in your browser’s `localStorage`. There is no backend, no analytics, and no login.
 

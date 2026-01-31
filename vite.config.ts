@@ -2,8 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const buildId = `${process.env.npm_package_version ?? '0.0.0'}-${new Date().toISOString()}`
+
 export default defineConfig({
   base: '/Habitcheck/',
+  build: {
+    // Keep sourcemaps enabled to debug production-only crashes.
+    sourcemap: true
+  },
+  define: {
+    __APP_BUILD_ID__: JSON.stringify(buildId)
+  },
   plugins: [
     react(),
     VitePWA({
@@ -37,7 +46,10 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
         navigateFallback: '/Habitcheck/index.html',
+        skipWaiting: true,
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'image',

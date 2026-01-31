@@ -5,7 +5,7 @@ import LineChart from '../components/LineChart'
 import QuoteCard from '../components/QuoteCard'
 import StatsCards from '../components/StatsCards'
 import ProgressBar from '../components/ProgressBar'
-import { Entry, ProtocolRun, Status, Tracker } from '../lib/types'
+import { Entry, ProtocolRun, Tracker } from '../lib/types'
 import { playStatusSound } from '../lib/sounds'
 import { todayString } from '../lib/dates'
 import { calculateGoalProgress, calculateStats } from '../lib/scoring'
@@ -13,7 +13,7 @@ import { getNextQuote } from '../lib/quotes'
 import EmergencyProtocolModal from '../components/EmergencyProtocolModal'
 import { createProtocolRun } from '../lib/protocol'
 import { getGoalModeDescription, getGoalModeLabel, getGoalUnitLabel } from '../lib/goals'
-import { getStatusLabel, statusMeta } from '../lib/status'
+import { Status, getStatusLabel, statusMeta } from '../lib/status'
 import StickyLogBar from '../components/StickyLogBar'
 
 const celebrationCopy: Record<Status, { title: string; message: string }> = {
@@ -90,18 +90,6 @@ const HomePage = ({
     }
   }, [entry?.status, entry?.note, entry?.updatedAt])
 
-  useEffect(() => {
-    if (!isActive) return
-    const handler = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-      if (key === 'g') handleStatusSelect('green')
-      if (key === 'y') handleStatusSelect('yellow')
-      if (key === 'r') handleStatusSelect('red')
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isActive, handleStatusSelect])
-
   const triggerSavedToast = useCallback((timestamp: number) => {
     setSavedAt(timestamp)
     setShowSavedToast(true)
@@ -135,6 +123,18 @@ const HomePage = ({
     },
     [commitSave, note, settings.hapticsEnabled, settings.soundsEnabled]
   )
+
+  useEffect(() => {
+    if (!isActive) return
+    const handler = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (key === 'g') handleStatusSelect('green')
+      if (key === 'y') handleStatusSelect('yellow')
+      if (key === 'r') handleStatusSelect('red')
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isActive, handleStatusSelect])
 
   useEffect(() => {
     if (!status) return

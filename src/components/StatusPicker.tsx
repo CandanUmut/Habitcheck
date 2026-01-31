@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Status } from '../lib/types'
-import { statusMeta } from '../lib/status'
+import { Status, statusMeta } from '../lib/status'
 
 type StatusPickerProps = {
   value: Status | null

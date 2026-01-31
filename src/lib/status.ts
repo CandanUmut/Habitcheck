@@ -1,4 +1,4 @@
-import { Status } from './types'
+export type Status = 'green' | 'yellow' | 'red'
 
 export const statusMeta: Record<Status, { label: string; helper: string; icon: string }> = {
   green: { label: 'All good', helper: 'Aligned with my goal', icon: '✅' },
@@ -6,6 +6,10 @@ export const statusMeta: Record<Status, { label: string; helper: string; icon: s
   red: { label: 'Reset day', helper: 'Not my day — I reset', icon: '🔄' }
 }
 
-export const getStatusLabel = (status: Status): string => statusMeta[status].label
+export function getStatusLabel(status: Status): string {
+  return statusMeta[status].label
+}
 
-export const getStatusHelper = (status: Status): string => statusMeta[status].helper
+export function getStatusHelper(status: Status): string {
+  return statusMeta[status].helper
+}

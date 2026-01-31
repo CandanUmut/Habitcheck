@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import CalendarGrid from '../components/CalendarGrid'
 import StatusPicker from '../components/StatusPicker'
 import { Entry, Status } from '../lib/types'
 import { formatDate, todayString } from '../lib/dates'
 import { getStatusLabel } from '../lib/status'
+import { NoteEntry, parseNoteValue, serializeNoteValue } from '../lib/notes'
 
 type HistoryPageProps = {
   entries: Entry[]
@@ -15,7 +16,9 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
   const [month, setMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [status, setStatus] = useState<Status | null>(null)
-  const [note, setNote] = useState('')
+  const [noteDraft, setNoteDraft] = useState('')
+  const [notes, setNotes] = useState<NoteEntry[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
 
   const selectedKey = formatDate(selectedDate)
   const selectedEntry = entries.find((entry) => entry.date === selectedKey)
@@ -26,7 +29,8 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
 
   useEffect(() => {
     setStatus(selectedEntry?.status ?? null)
-    setNote(selectedEntry?.note ?? '')
+    setNotes(parseNoteValue(selectedEntry?.note))
+    setNoteDraft('')
   }, [selectedEntry])
 
   useEffect(() => {
@@ -41,8 +45,45 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
 
   const handleSave = () => {
     if (!status) return
-    onSave(selectedKey, status, note)
+    onSave(selectedKey, status, serializeNoteValue(notes))
   }
+
+  const handleAddNote = () => {
+    if (!status) return
+    const trimmed = noteDraft.trim()
+    if (!trimmed) return
+    const nextNotes = [...notes, { text: trimmed, createdAt: Date.now() }]
+    setNotes(nextNotes)
+    setNoteDraft('')
+    onSave(selectedKey, status, serializeNoteValue(nextNotes))
+  }
+
+  const noteHistory = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+    const allNotes = entries.flatMap((entry) =>
+      parseNoteValue(entry.note).map((note) => ({
+        ...note,
+        date: entry.date,
+        status: entry.status
+      }))
+    )
+    const filtered = normalizedSearch
+      ? allNotes.filter(
+          (note) =>
+            note.text.toLowerCase().includes(normalizedSearch) ||
+            note.date.toLowerCase().includes(normalizedSearch)
+        )
+      : allNotes
+    return filtered.sort((a, b) => {
+      if (a.date === b.date) return b.createdAt - a.createdAt
+      return b.date.localeCompare(a.date)
+    })
+  }, [entries, searchTerm])
+
+  const selectedNotes = useMemo(
+    () => [...notes].sort((a, b) => b.createdAt - a.createdAt),
+    [notes]
+  )
 
   return (
     <section className="page">
@@ -88,18 +129,91 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
           <span className="saved-meta">{lastSavedLabel}</span>
         </div>
         <StatusPicker value={status} onChange={setStatus} size="medium" requireHoldForRed />
+        <div className="note-editor">
+          <label className="field">
+            <span>Add a note</span>
+            <textarea
+              rows={3}
+              value={noteDraft}
+              onChange={(event) => setNoteDraft(event.target.value)}
+              placeholder="Write a note for this day..."
+            />
+          </label>
+          <div className="note-actions">
+            <button
+              type="button"
+              className="primary"
+              onClick={handleAddNote}
+              disabled={!status || !noteDraft.trim()}
+            >
+              Add note
+            </button>
+            <button type="button" className="ghost" onClick={handleSave} disabled={!status}>
+              Save status
+            </button>
+          </div>
+        </div>
+        {selectedNotes.length > 0 && (
+          <div className="note-history">
+            <p className="subtle">Notes for {selectedKey}</p>
+            <ul className="note-list">
+              {selectedNotes.map((item) => (
+                <li key={`${item.createdAt}-${item.text}`} className="note-item">
+                  <p>{item.text}</p>
+                  {item.createdAt > 0 && (
+                    <span className="note-meta">
+                      {new Date(item.createdAt).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="history-header">
+          <div>
+            <h3>Notes history</h3>
+            <p className="subtle">Search by date or keyword to find past notes.</p>
+          </div>
+        </div>
         <label className="field">
-          <span>Optional note</span>
-          <textarea
-            rows={3}
-            value={note}
-            onChange={(event) => setNote(event.target.value)}
-            placeholder="Add a short note..."
+          <span>Search notes</span>
+          <input
+            type="search"
+            value={searchTerm}
+            onChange={(event) => setSearchTerm(event.target.value)}
+            placeholder="Search YYYY-MM-DD or a keyword..."
           />
         </label>
-        <button type="button" className="primary" onClick={handleSave} disabled={!status}>
-          Save update
-        </button>
+        {noteHistory.length === 0 ? (
+          <p className="subtle">No notes match this search yet.</p>
+        ) : (
+          <ul className="note-list">
+            {noteHistory.map((item) => (
+              <li key={`${item.date}-${item.createdAt}-${item.text}`} className="note-item">
+                <div className="note-header">
+                  <strong>{item.date}</strong>
+                  <span className={`status-chip ${item.status}`}>{getStatusLabel(item.status)}</span>
+                </div>
+                <p>{item.text}</p>
+                {item.createdAt > 0 && (
+                  <span className="note-meta">
+                    {new Date(item.createdAt).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   )

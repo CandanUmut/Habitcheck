@@ -14,7 +14,7 @@ import EmergencyProtocolModal from '../components/EmergencyProtocolModal'
 import { createProtocolRun } from '../lib/protocol'
 import { getGoalModeDescription, getGoalModeLabel, getGoalUnitLabel } from '../lib/goals'
 import { Status, getStatusLabel, statusMeta } from '../lib/status'
-import StickyLogBar from '../components/StickyLogBar'
+import { NoteEntry, parseNoteValue, serializeNoteValue } from '../lib/notes'
 
 const celebrationCopy: Record<Status, { title: string; message: string }> = {
   green: { title: 'All good logged!', message: 'You are building momentum.' },
@@ -46,11 +46,11 @@ const HomePage = ({
   const todayKey = todayString()
   const entry = entries.find((item) => item.date === todayKey)
   const [status, setStatus] = useState<Status | null>(entry?.status ?? null)
-  const [note, setNote] = useState(entry?.note ?? '')
   const [celebration, setCelebration] = useState<Status | null>(null)
   const [quote, setQuote] = useState(() => getNextQuote())
   const [protocolOpen, setProtocolOpen] = useState(false)
-  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteDraft, setNoteDraft] = useState('')
+  const [notes, setNotes] = useState<NoteEntry[]>(() => parseNoteValue(entry?.note))
   const [savedAt, setSavedAt] = useState<number | null>(entry?.updatedAt ?? null)
   const [showSavedToast, setShowSavedToast] = useState(false)
   const toastTimeoutRef = useRef<number | null>(null)
@@ -81,7 +81,8 @@ const HomePage = ({
 
   useEffect(() => {
     setStatus(entry?.status ?? null)
-    setNote(entry?.note ?? '')
+    setNotes(parseNoteValue(entry?.note))
+    setNoteDraft('')
     setSavedAt(entry?.updatedAt ?? null)
     if (entry?.status) {
       lastSavedRef.current = { status: entry.status, note: entry.note?.trim() ?? '' }
@@ -111,7 +112,7 @@ const HomePage = ({
   const handleStatusSelect = useCallback(
     (nextStatus: Status) => {
       setStatus(nextStatus)
-      commitSave(nextStatus, note)
+      commitSave(nextStatus, serializeNoteValue(notes))
       if (settings.soundsEnabled) {
         playStatusSound(nextStatus)
       }
@@ -121,7 +122,7 @@ const HomePage = ({
       setCelebration(nextStatus)
       window.setTimeout(() => setCelebration(null), 1500)
     },
-    [commitSave, note, settings.hapticsEnabled, settings.soundsEnabled]
+    [commitSave, notes, settings.hapticsEnabled, settings.soundsEnabled]
   )
 
   useEffect(() => {
@@ -138,14 +139,10 @@ const HomePage = ({
 
   useEffect(() => {
     if (!status) return
-    const trimmedNote = note.trim()
     const lastSaved = lastSavedRef.current
-    if (lastSaved && lastSaved.status === status && lastSaved.note === trimmedNote) return
-    const timeout = window.setTimeout(() => {
-      commitSave(status, note)
-    }, 650)
-    return () => window.clearTimeout(timeout)
-  }, [note, status])
+    if (lastSaved && lastSaved.status === status) return
+    commitSave(status, serializeNoteValue(notes))
+  }, [status])
 
   const handleNewQuote = () => {
     setQuote(getNextQuote())
@@ -165,6 +162,21 @@ const HomePage = ({
     goalProgress.monthly.remaining <= 0
       ? 'Monthly goal hit 🎉'
       : `${goalProgress.monthly.remaining} ${unitLabel} left to hit your monthly goal`
+
+  const handleAddNote = () => {
+    if (!status) return
+    const trimmed = noteDraft.trim()
+    if (!trimmed) return
+    const nextNotes = [...notes, { text: trimmed, createdAt: Date.now() }]
+    setNotes(nextNotes)
+    setNoteDraft('')
+    commitSave(status, serializeNoteValue(nextNotes))
+  }
+
+  const sortedNotes = useMemo(
+    () => [...notes].sort((a, b) => b.createdAt - a.createdAt),
+    [notes]
+  )
 
   return (
     <section className="page">
@@ -199,23 +211,42 @@ const HomePage = ({
         </div>
         {tracker.dailyQuestionEnabled && (
           <div className="daily-question">
+            <label className="field">
+              <span>{tracker.dailyQuestionText}</span>
+              <textarea
+                rows={3}
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                placeholder="Write a quick note..."
+              />
+            </label>
             <button
               type="button"
-              className="ghost note-toggle"
-              onClick={() => setNoteOpen((prev) => !prev)}
+              className="primary"
+              onClick={handleAddNote}
+              disabled={!status || !noteDraft.trim()}
             >
-              {noteOpen ? 'Hide note' : 'Add note'}
+              Add note
             </button>
-            {noteOpen && (
-              <label className="field">
-                <span>{tracker.dailyQuestionText}</span>
-                <textarea
-                  rows={3}
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  placeholder="A quick note..."
-                />
-              </label>
+            {sortedNotes.length > 0 && (
+              <div className="note-history">
+                <p className="subtle">Notes today</p>
+                <ul className="note-list">
+                  {sortedNotes.map((item) => (
+                    <li key={`${item.createdAt}-${item.text}`} className="note-item">
+                      <p>{item.text}</p>
+                      {item.createdAt > 0 && (
+                        <span className="note-meta">
+                          {new Date(item.createdAt).toLocaleTimeString([], {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}
@@ -296,7 +327,6 @@ const HomePage = ({
         hapticsEnabled={settings.hapticsEnabled}
         createRun={createProtocolRun}
       />
-      <StickyLogBar status={status} onSelect={handleStatusSelect} savedAt={savedAt} />
     </section>
   )
 }

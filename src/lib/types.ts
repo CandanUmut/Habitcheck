@@ -1,4 +1,6 @@
-export type Status = 'green' | 'yellow' | 'red'
+import type { Status } from './status'
+
+export type { Status } from './status'
 
 export type GoalMode = 'consistency' | 'green' | 'points'
 

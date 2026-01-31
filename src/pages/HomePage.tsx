@@ -90,18 +90,6 @@ const HomePage = ({
     }
   }, [entry?.status, entry?.note, entry?.updatedAt])
 
-  useEffect(() => {
-    if (!isActive) return
-    const handler = (event: KeyboardEvent) => {
-      const key = event.key.toLowerCase()
-      if (key === 'g') handleStatusSelect('green')
-      if (key === 'y') handleStatusSelect('yellow')
-      if (key === 'r') handleStatusSelect('red')
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isActive, handleStatusSelect])
-
   const triggerSavedToast = useCallback((timestamp: number) => {
     setSavedAt(timestamp)
     setShowSavedToast(true)
@@ -135,6 +123,18 @@ const HomePage = ({
     },
     [commitSave, note, settings.hapticsEnabled, settings.soundsEnabled]
   )
+
+  useEffect(() => {
+    if (!isActive) return
+    const handler = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase()
+      if (key === 'g') handleStatusSelect('green')
+      if (key === 'y') handleStatusSelect('yellow')
+      if (key === 'r') handleStatusSelect('red')
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isActive, handleStatusSelect])
 
   useEffect(() => {
     if (!status) return

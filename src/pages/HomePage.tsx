@@ -128,6 +128,13 @@ const HomePage = ({
   useEffect(() => {
     if (!isActive) return
     const handler = (event: KeyboardEvent) => {
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+      ) {
+        return
+      }
       const key = event.key.toLowerCase()
       if (key === 'g') handleStatusSelect('green')
       if (key === 'y') handleStatusSelect('yellow')
@@ -210,27 +217,55 @@ const HomePage = ({
           </div>
         </div>
         {tracker.dailyQuestionEnabled && (
-          <div className="daily-question">
-            <label className="field">
-              <span>{tracker.dailyQuestionText}</span>
-              <textarea
-                rows={3}
-                value={noteDraft}
-                onChange={(event) => setNoteDraft(event.target.value)}
-                placeholder="Write a quick note..."
-              />
-            </label>
-            <button
-              type="button"
-              className="primary"
-              onClick={handleAddNote}
-              disabled={!status || !noteDraft.trim()}
-            >
-              Add note
-            </button>
+          <div className="daily-question note-panel">
+            <div className="note-panel-header">
+              <div>
+                <p className="eyebrow">Notes</p>
+                <h3 className="note-title">{tracker.dailyQuestionText}</h3>
+                <p className="subtle">Capture anything that adds context for today.</p>
+              </div>
+              <div className="note-panel-meta">
+                <span className="note-count">{sortedNotes.length} entries</span>
+                <span className="note-hint">Saved with your status</span>
+              </div>
+            </div>
+            <div className="note-composer">
+              <label className="field note-field">
+                <span>Quick capture</span>
+                <textarea
+                  rows={3}
+                  value={noteDraft}
+                  onChange={(event) => setNoteDraft(event.target.value)}
+                  placeholder="Write a quick note..."
+                />
+              </label>
+              <div className="note-actions">
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={handleAddNote}
+                  disabled={!status || !noteDraft.trim()}
+                >
+                  Add note
+                </button>
+                {noteDraft.trim().length > 0 && (
+                  <button type="button" className="ghost" onClick={() => setNoteDraft('')}>
+                    Clear draft
+                  </button>
+                )}
+              </div>
+            </div>
             {sortedNotes.length > 0 && (
               <div className="note-history">
-                <p className="subtle">Notes today</p>
+                <div className="note-history-header">
+                  <p className="subtle">Notes today</p>
+                  <span className="note-meta">
+                    Latest at {new Date(sortedNotes[0].createdAt).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
                 <ul className="note-list">
                   {sortedNotes.map((item) => (
                     <li key={`${item.createdAt}-${item.text}`} className="note-item">

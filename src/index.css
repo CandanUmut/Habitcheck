@@ -817,6 +817,64 @@ h4 {
   gap: 12px;
 }
 
+.note-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(148, 163, 184, 0.12), rgba(94, 234, 212, 0.08));
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.note-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.note-panel-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-end;
+  text-align: right;
+}
+
+.note-title {
+  margin: 4px 0;
+}
+
+.note-count {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  font-weight: 600;
+}
+
+.note-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.note-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.note-field textarea {
+  min-height: 90px;
+}
+
 .note-history {
   display: flex;
   flex-direction: column;
@@ -824,6 +882,14 @@ h4 {
   padding: 12px;
   border-radius: 14px;
   background: rgba(148, 163, 184, 0.12);
+}
+
+.note-history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .note-list {

@@ -129,33 +129,59 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
           <span className="saved-meta">{lastSavedLabel}</span>
         </div>
         <StatusPicker value={status} onChange={setStatus} size="medium" requireHoldForRed />
-        <div className="note-editor">
-          <label className="field">
-            <span>Add a note</span>
-            <textarea
-              rows={3}
-              value={noteDraft}
-              onChange={(event) => setNoteDraft(event.target.value)}
-              placeholder="Write a note for this day..."
-            />
-          </label>
-          <div className="note-actions">
-            <button
-              type="button"
-              className="primary"
-              onClick={handleAddNote}
-              disabled={!status || !noteDraft.trim()}
-            >
-              Add note
-            </button>
-            <button type="button" className="ghost" onClick={handleSave} disabled={!status}>
-              Save status
-            </button>
+        <div className="note-panel">
+          <div className="note-panel-header">
+            <div>
+              <p className="eyebrow">Notes</p>
+              <h3 className="note-title">Notes for {selectedKey}</h3>
+              <p className="subtle">Add context for this day.</p>
+            </div>
+            <div className="note-panel-meta">
+              <span className="note-count">{selectedNotes.length} entries</span>
+              <span className="note-hint">Saved to this date</span>
+            </div>
+          </div>
+          <div className="note-composer">
+            <label className="field note-field">
+              <span>Add a note</span>
+              <textarea
+                rows={3}
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                placeholder="Write a note for this day..."
+              />
+            </label>
+            <div className="note-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={handleAddNote}
+                disabled={!status || !noteDraft.trim()}
+              >
+                Add note
+              </button>
+              <button type="button" className="ghost" onClick={handleSave} disabled={!status}>
+                Save status
+              </button>
+              {noteDraft.trim().length > 0 && (
+                <button type="button" className="ghost" onClick={() => setNoteDraft('')}>
+                  Clear draft
+                </button>
+              )}
+            </div>
           </div>
         </div>
         {selectedNotes.length > 0 && (
           <div className="note-history">
-            <p className="subtle">Notes for {selectedKey}</p>
+            <div className="note-history-header">
+              <p className="subtle">Notes for {selectedKey}</p>
+              <span className="note-meta">
+                Latest at {new Date(selectedNotes[0].createdAt).toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit'
+                })}
+              </span>
+            </div>
             <ul className="note-list">
               {selectedNotes.map((item) => (
                 <li key={`${item.createdAt}-${item.text}`} className="note-item">

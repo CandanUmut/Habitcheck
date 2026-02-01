@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Toggle from '../components/Toggle'
 import { AppSettings, BadgesState, Entry, ProtocolRun, Tracker } from '../lib/types'
 import { createTracker, defaultSettings, exportData, importData, resetData } from '../lib/storage'
@@ -34,10 +34,18 @@ const SettingsPage = ({
 }: SettingsPageProps) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [importError, setImportError] = useState('')
+  const [weeklyTargetDraft, setWeeklyTargetDraft] = useState('')
+  const [monthlyTargetDraft, setMonthlyTargetDraft] = useState('')
   const activeTracker = useMemo(
     () => trackers.find((tracker) => tracker.id === activeTrackerId) ?? trackers[0],
     [trackers, activeTrackerId]
   )
+
+  useEffect(() => {
+    if (!activeTracker) return
+    setWeeklyTargetDraft(String(activeTracker.weeklyTarget))
+    setMonthlyTargetDraft(String(activeTracker.monthlyTarget))
+  }, [activeTracker?.id, activeTracker?.weeklyTarget, activeTracker?.monthlyTarget])
   const updateTracker = (updates: Partial<Tracker>) => {
     if (!activeTracker) return
     onUpdateTrackers(
@@ -213,10 +221,20 @@ const SettingsPage = ({
               <input
                 type="number"
                 min={1}
-                value={activeTracker.weeklyTarget}
+                value={weeklyTargetDraft}
                 onChange={(event) => {
-                  const value = Number(event.target.value)
-                  updateTracker({ weeklyTarget: Number.isFinite(value) ? Math.max(1, value) : activeTracker.weeklyTarget })
+                  const nextValue = event.target.value
+                  setWeeklyTargetDraft(nextValue)
+                  const parsed = Number(nextValue)
+                  if (Number.isFinite(parsed) && parsed >= 1) {
+                    updateTracker({ weeklyTarget: parsed })
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number(weeklyTargetDraft)
+                  const normalized = Number.isFinite(parsed) && parsed >= 1 ? parsed : activeTracker.weeklyTarget
+                  setWeeklyTargetDraft(String(normalized))
+                  updateTracker({ weeklyTarget: normalized })
                 }}
               />
             </label>
@@ -225,10 +243,20 @@ const SettingsPage = ({
               <input
                 type="number"
                 min={1}
-                value={activeTracker.monthlyTarget}
+                value={monthlyTargetDraft}
                 onChange={(event) => {
-                  const value = Number(event.target.value)
-                  updateTracker({ monthlyTarget: Number.isFinite(value) ? Math.max(1, value) : activeTracker.monthlyTarget })
+                  const nextValue = event.target.value
+                  setMonthlyTargetDraft(nextValue)
+                  const parsed = Number(nextValue)
+                  if (Number.isFinite(parsed) && parsed >= 1) {
+                    updateTracker({ monthlyTarget: parsed })
+                  }
+                }}
+                onBlur={() => {
+                  const parsed = Number(monthlyTargetDraft)
+                  const normalized = Number.isFinite(parsed) && parsed >= 1 ? parsed : activeTracker.monthlyTarget
+                  setMonthlyTargetDraft(String(normalized))
+                  updateTracker({ monthlyTarget: normalized })
                 }}
               />
             </label>

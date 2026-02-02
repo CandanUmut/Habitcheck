@@ -180,6 +180,15 @@ const HomePage = ({
     commitSave(status, serializeNoteValue(nextNotes))
   }
 
+  const handleDeleteNote = (noteToRemove: NoteEntry) => {
+    if (!status) return
+    const nextNotes = notes.filter(
+      (note) => note.createdAt !== noteToRemove.createdAt || note.text !== noteToRemove.text
+    )
+    setNotes(nextNotes)
+    commitSave(status, serializeNoteValue(nextNotes))
+  }
+
   const sortedNotes = useMemo(
     () => [...notes].sort((a, b) => b.createdAt - a.createdAt),
     [notes]
@@ -270,14 +279,23 @@ const HomePage = ({
                   {sortedNotes.map((item) => (
                     <li key={`${item.createdAt}-${item.text}`} className="note-item">
                       <p>{item.text}</p>
-                      {item.createdAt > 0 && (
-                        <span className="note-meta">
-                          {new Date(item.createdAt).toLocaleTimeString([], {
-                            hour: 'numeric',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      )}
+                      <div className="note-item-footer">
+                        {item.createdAt > 0 && (
+                          <span className="note-meta">
+                            {new Date(item.createdAt).toLocaleTimeString([], {
+                              hour: 'numeric',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          className="note-delete"
+                          onClick={() => handleDeleteNote(item)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </li>
                   ))}
                 </ul>

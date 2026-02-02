@@ -911,9 +911,32 @@ h4 {
   border: 1px solid var(--border);
 }
 
+.note-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .note-meta {
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+.note-delete {
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: transparent;
+  color: #b91c1c;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.note-delete:hover {
+  background: rgba(239, 68, 68, 0.1);
 }
 
 .note-header {

@@ -58,6 +58,27 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
     onSave(selectedKey, status, serializeNoteValue(nextNotes))
   }
 
+  const handleDeleteNote = (noteToRemove: NoteEntry) => {
+    if (!status) return
+    const nextNotes = notes.filter(
+      (note) => note.createdAt !== noteToRemove.createdAt || note.text !== noteToRemove.text
+    )
+    setNotes(nextNotes)
+    onSave(selectedKey, status, serializeNoteValue(nextNotes))
+  }
+
+  const handleDeleteHistoricalNote = (noteToRemove: NoteEntry & { date: string }) => {
+    const entry = entries.find((item) => item.date === noteToRemove.date)
+    if (!entry) return
+    const nextNotes = parseNoteValue(entry.note).filter(
+      (note) => note.createdAt !== noteToRemove.createdAt || note.text !== noteToRemove.text
+    )
+    onSave(noteToRemove.date, entry.status, serializeNoteValue(nextNotes))
+    if (noteToRemove.date === selectedKey) {
+      setNotes(nextNotes)
+    }
+  }
+
   const noteHistory = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase()
     const allNotes = entries.flatMap((entry) =>
@@ -186,14 +207,23 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
               {selectedNotes.map((item) => (
                 <li key={`${item.createdAt}-${item.text}`} className="note-item">
                   <p>{item.text}</p>
-                  {item.createdAt > 0 && (
-                    <span className="note-meta">
-                      {new Date(item.createdAt).toLocaleTimeString([], {
-                        hour: 'numeric',
-                        minute: '2-digit'
-                      })}
-                    </span>
-                  )}
+                  <div className="note-item-footer">
+                    {item.createdAt > 0 && (
+                      <span className="note-meta">
+                        {new Date(item.createdAt).toLocaleTimeString([], {
+                          hour: 'numeric',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className="note-delete"
+                      onClick={() => handleDeleteNote(item)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -228,14 +258,23 @@ const HistoryPage = ({ entries, trackerName, onSave }: HistoryPageProps) => {
                   <span className={`status-chip ${item.status}`}>{getStatusLabel(item.status)}</span>
                 </div>
                 <p>{item.text}</p>
-                {item.createdAt > 0 && (
-                  <span className="note-meta">
-                    {new Date(item.createdAt).toLocaleTimeString([], {
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                )}
+                <div className="note-item-footer">
+                  {item.createdAt > 0 && (
+                    <span className="note-meta">
+                      {new Date(item.createdAt).toLocaleTimeString([], {
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="note-delete"
+                    onClick={() => handleDeleteHistoricalNote(item)}
+                  >
+                    Delete
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

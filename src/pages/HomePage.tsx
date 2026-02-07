@@ -197,119 +197,125 @@ const HomePage = ({
   return (
     <section className="page">
       <header className="page-header">
-        <p className="eyebrow">Today</p>
+        <p className="eyebrow">Habitcheck</p>
         <h1>{tracker.name}</h1>
-        <p className="subtle">Log today in under five seconds.</p>
-        <span className={`status-chip ${entry?.status ?? 'pending'}`}>Today: {todayStatusLabel}</span>
-        <div className="log-today quick-log">
-          <StatusPicker
-            value={status}
-            onChange={handleStatusSelect}
-            size="medium"
-            variant="compact"
-            requireHoldForRed
-          />
-          <div className="saved-row">
-            <span className="saved-meta">{lastSavedLabel}</span>
-            {showSavedToast && <span className="saved-toast">Saved ✓</span>}
-          </div>
-        </div>
+        <p className="subtle">Log your check-in in under five seconds.</p>
       </header>
 
       <div className="card logging-card hero-card">
-        <div className={`today-status ${entry?.status ?? 'pending'}`}>
+        <div className="log-summary">
           <div>
-            <p className="subtle">Today’s check-in</p>
-            <strong>{entry ? todayStatusLabel : 'Pick a log for today'}</strong>
+            <h2>Daily check-in</h2>
+            <p className="subtle">Choose a status below. You can update anytime.</p>
           </div>
-          <span className="today-icon" aria-hidden>
-            {entry ? statusMeta[entry.status].icon : '🗓️'}
-          </span>
+          <div className={`status-summary ${entry?.status ?? 'pending'}`}>
+            <div>
+              <p className="subtle">Today</p>
+              <strong>{entry ? todayStatusLabel : 'Not logged yet'}</strong>
+              <span className="status-meta">{entry ? lastSavedLabel : 'Pick a log below'}</span>
+            </div>
+            <div className="status-summary-end">
+              <span className="today-icon" aria-hidden>
+                {entry ? statusMeta[entry.status].icon : '🗓️'}
+              </span>
+              {showSavedToast && <span className="saved-toast">Saved</span>}
+            </div>
+          </div>
+        </div>
+        <div className="status-actions">
+          <StatusPicker
+            value={status}
+            onChange={handleStatusSelect}
+            size="large"
+            variant="compact"
+            requireHoldForRed
+          />
         </div>
         {!entry && (
           <div className="nudge">
             <strong>Quick nudge:</strong> You have not logged today yet.
           </div>
         )}
-        {tracker.dailyQuestionEnabled && (
-          <div className="daily-question note-panel">
-            <div className="note-panel-header">
-              <div>
-                <p className="eyebrow">Notes</p>
-                <h3 className="note-title">{tracker.dailyQuestionText}</h3>
-                <p className="subtle">Capture anything that adds context for today.</p>
-              </div>
-              <div className="note-panel-meta">
-                <span className="note-count">{sortedNotes.length} entries</span>
-                <span className="note-hint">Saved with your status</span>
-              </div>
-            </div>
-            <div className="note-composer">
-              <label className="field note-field">
-                <span>Quick capture</span>
-                <textarea
-                  rows={3}
-                  value={noteDraft}
-                  onChange={(event) => setNoteDraft(event.target.value)}
-                  placeholder="Write a quick note..."
-                />
-              </label>
-              <div className="note-actions">
-                <button
-                  type="button"
-                  className="primary"
-                  onClick={handleAddNote}
-                  disabled={!status || !noteDraft.trim()}
-                >
-                  Add note
-                </button>
-                {noteDraft.trim().length > 0 && (
-                  <button type="button" className="ghost" onClick={() => setNoteDraft('')}>
-                    Clear draft
-                  </button>
-                )}
-              </div>
-            </div>
-            {sortedNotes.length > 0 && (
-              <div className="note-history">
-                <div className="note-history-header">
-                  <p className="subtle">Notes today</p>
-                  <span className="note-meta">
-                    Latest at {new Date(sortedNotes[0].createdAt).toLocaleTimeString([], {
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
-                <ul className="note-list">
-                  {sortedNotes.map((item) => (
-                    <li key={`${item.createdAt}-${item.text}`} className="note-item">
-                      <p>{item.text}</p>
-                      <div className="note-item-footer">
-                        {item.createdAt > 0 && (
-                          <span className="note-meta">
-                            {new Date(item.createdAt).toLocaleTimeString([], {
-                              hour: 'numeric',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          className="note-delete"
-                          onClick={() => handleDeleteNote(item)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
       </div>
+
+      {tracker.dailyQuestionEnabled && (
+        <div className="card note-panel daily-question">
+          <div className="note-panel-header">
+            <div>
+              <p className="eyebrow">Notes</p>
+              <h3 className="note-title">{tracker.dailyQuestionText}</h3>
+              <p className="subtle">Capture anything that adds context for today.</p>
+            </div>
+            <div className="note-panel-meta">
+              <span className="note-count">{sortedNotes.length} entries</span>
+              <span className="note-hint">Saved with your status</span>
+            </div>
+          </div>
+          <div className="note-composer">
+            <label className="field note-field">
+              <span>Quick capture</span>
+              <textarea
+                rows={3}
+                value={noteDraft}
+                onChange={(event) => setNoteDraft(event.target.value)}
+                placeholder="Write a quick note..."
+              />
+            </label>
+            <div className="note-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={handleAddNote}
+                disabled={!status || !noteDraft.trim()}
+              >
+                Add note
+              </button>
+              {noteDraft.trim().length > 0 && (
+                <button type="button" className="ghost" onClick={() => setNoteDraft('')}>
+                  Clear draft
+                </button>
+              )}
+            </div>
+          </div>
+          {sortedNotes.length > 0 && (
+            <div className="note-history">
+              <div className="note-history-header">
+                <p className="subtle">Notes today</p>
+                <span className="note-meta">
+                  Latest at {new Date(sortedNotes[0].createdAt).toLocaleTimeString([], {
+                    hour: 'numeric',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              <ul className="note-list">
+                {sortedNotes.map((item) => (
+                  <li key={`${item.createdAt}-${item.text}`} className="note-item">
+                    <p>{item.text}</p>
+                    <div className="note-item-footer">
+                      {item.createdAt > 0 && (
+                        <span className="note-meta">
+                          {new Date(item.createdAt).toLocaleTimeString([], {
+                            hour: 'numeric',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="note-delete"
+                        onClick={() => handleDeleteNote(item)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card progress-card">
         <div>

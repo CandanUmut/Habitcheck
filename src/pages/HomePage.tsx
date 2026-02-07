@@ -72,7 +72,13 @@ const HomePage = ({
       ),
     [entries, trackerProtocolRuns, tracker.goalMode, tracker.weeklyTarget, tracker.monthlyTarget]
   )
+  const last7Total = stats.last7.green + stats.last7.yellow + stats.last7.red
+  const last7AllGoodRate = last7Total ? Math.round((stats.last7.green / last7Total) * 100) : 0
+  const last7Insight = last7Total
+    ? `${last7AllGoodRate}% all-good · ${stats.consistencyWeekly}% logged`
+    : 'No logs in the last 7 days yet'
   const last7Summary = `All good ${stats.last7.green} • Mixed ${stats.last7.yellow} • Reset ${stats.last7.red}`
+  const weeklyAvgPoints = Number((stats.momentumWeekly / 7).toFixed(1))
   const todayStatusLabel = entry ? getStatusLabel(entry.status) : 'Ready to log'
   const protocolToday = trackerProtocolRuns.find((run) => run.date === todayKey && run.completedAt)
   const lastSavedLabel = savedAt
@@ -157,8 +163,9 @@ const HomePage = ({
 
   const progressCards = [
     { label: 'All-good streak', value: stats.currentGreenStreak },
-    { label: 'Last 7 breakdown', value: last7Summary },
-    { label: 'Weekly points', value: `${stats.momentumWeekly} pts` }
+    { label: 'Logged this week', value: `${stats.loggedLast7}/7 days` },
+    { label: 'All-good rate', value: last7Total ? `${last7AllGoodRate}%` : '—' },
+    { label: 'Avg points/day', value: `${weeklyAvgPoints} pts` }
   ]
   const unitLabel = getGoalUnitLabel(tracker.goalMode)
   const weeklyHelper =
@@ -351,10 +358,13 @@ const HomePage = ({
           <div className="chart-block">
             <p className="subtle">Last 7 days</p>
             <DonutChart counts={stats.last7} />
+            <p className="subtle chart-meta">{last7Summary}</p>
+            <p className="subtle chart-meta">{last7Insight}</p>
           </div>
           <div className="chart-block">
             <p className="subtle">14-day points trend</p>
             <LineChart values={stats.dailyScores.slice(-14)} />
+            <p className="subtle chart-meta">Weekly momentum: {stats.momentumWeekly} pts.</p>
             <p className="subtle tiny">Trend updates with every log.</p>
           </div>
         </div>

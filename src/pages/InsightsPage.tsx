@@ -49,6 +49,12 @@ const InsightsPage = ({
     ]
     return pairs.sort((a, b) => b.count - a.count)[0]
   })()
+  const last30Total = stats.last30.green + stats.last30.yellow + stats.last30.red
+  const last30AllGoodRate = last30Total ? Math.round((stats.last30.green / last30Total) * 100) : 0
+  const last30MixedRate = last30Total ? Math.round((stats.last30.yellow / last30Total) * 100) : 0
+  const last30ResetRate = last30Total ? Math.round((stats.last30.red / last30Total) * 100) : 0
+  const weeklyAvgPoints = Number((stats.momentumWeekly / 7).toFixed(1))
+  const monthlyAvgPoints = Number((stats.momentumMonthly / 30).toFixed(1))
   const weeklyHelper =
     goalProgress.weekly.remaining <= 0
       ? 'Weekly goal hit 🎉'
@@ -79,18 +85,21 @@ const InsightsPage = ({
       <div className="card">
         <h3>30-day snapshot</h3>
         <p className="summary-line">
-          Last 30 days: Green {stats.last30.green} / Yellow {stats.last30.yellow} / Red {stats.last30.red}
+          Last 30 days: {stats.loggedLast30}/30 logged · {last30AllGoodRate}% all-good
         </p>
         <StatsCards
           items={[
-            { label: 'Most common status', value: `${getStatusLabel(mostCommonStatus.status)} (${mostCommonStatus.count})` },
-            { label: 'Protocol saves (30d)', value: protocolRecent.length },
-            { label: 'Weekly points', value: `${stats.momentumWeekly} pts` },
-            { label: 'Monthly points', value: `${stats.momentumMonthly} pts` }
+            {
+              label: 'Most common status',
+              value: `${getStatusLabel(mostCommonStatus.status)} (${mostCommonStatus.count})`
+            },
+            { label: 'Logging consistency', value: `${stats.consistencyMonthly}%` },
+            { label: 'Avg points/day', value: `${monthlyAvgPoints} pts` },
+            { label: 'Protocol saves (30d)', value: protocolRecent.length }
           ]}
         />
         <p className="subtle">
-          Last 30 days logged: {stats.loggedLast30} days · Completion {stats.consistencyMonthly}%.
+          Breakdown: {last30AllGoodRate}% all-good · {last30MixedRate}% mixed · {last30ResetRate}% reset days.
         </p>
       </div>
 
@@ -129,14 +138,21 @@ const InsightsPage = ({
         <div className="chart-block">
           <h3>Last 7 days</h3>
           <DonutChart counts={stats.last7} />
+          <p className="subtle chart-meta">
+            {stats.loggedLast7}/7 logged · {stats.consistencyWeekly}% consistency.
+          </p>
         </div>
         <div className="chart-block">
           <h3>Last 30 days</h3>
           <DonutChart counts={stats.last30} />
+          <p className="subtle chart-meta">
+            {last30AllGoodRate}% all-good · {stats.consistencyMonthly}% consistency.
+          </p>
         </div>
         <div className="chart-block full">
           <h3>30-day points trend</h3>
           <LineChart values={stats.dailyScores} height={160} />
+          <p className="subtle chart-meta">Weekly momentum: {stats.momentumWeekly} pts · Avg/day {weeklyAvgPoints} pts.</p>
         </div>
       </div>
 

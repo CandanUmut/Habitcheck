@@ -20,7 +20,7 @@ const DonutChart = ({ counts, size = 120, strokeWidth = 18 }: DonutChartProps) =
     { key: 'green', value: counts.green },
     { key: 'yellow', value: counts.yellow },
     { key: 'red', value: counts.red }
-  ]
+  ].filter((segment) => segment.value > 0)
 
   let offset = 0
   return (

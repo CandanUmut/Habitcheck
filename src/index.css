@@ -119,6 +119,10 @@ body {
   gap: 8px;
 }
 
+.page-header .quick-log {
+  margin-top: 4px;
+}
+
 .eyebrow {
   text-transform: uppercase;
   letter-spacing: 0.16em;

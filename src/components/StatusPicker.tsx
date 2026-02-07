@@ -117,7 +117,7 @@ const StatusPicker = ({
             {requiresHold && (
               <span className="status-hold-label">{isHolding ? 'Keep holding…' : 'Hold to confirm'}</span>
             )}
-            {isSelected && <span className="status-selected-label">Selected</span>}
+            {isSelected && <span className="sr-only">Selected</span>}
           </button>
         )
       })}

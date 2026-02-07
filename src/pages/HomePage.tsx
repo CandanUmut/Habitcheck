@@ -73,7 +73,7 @@ const HomePage = ({
     [entries, trackerProtocolRuns, tracker.goalMode, tracker.weeklyTarget, tracker.monthlyTarget]
   )
   const last7Summary = `All good ${stats.last7.green} • Mixed ${stats.last7.yellow} • Reset ${stats.last7.red}`
-  const todayStatusLabel = entry ? getStatusLabel(entry.status) : 'Not logged'
+  const todayStatusLabel = entry ? getStatusLabel(entry.status) : 'Ready to log'
   const protocolToday = trackerProtocolRuns.find((run) => run.date === todayKey && run.completedAt)
   const lastSavedLabel = savedAt
     ? `Saved ${new Date(savedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
@@ -201,13 +201,26 @@ const HomePage = ({
         <h1>{tracker.name}</h1>
         <p className="subtle">Log today in under five seconds.</p>
         <span className={`status-chip ${entry?.status ?? 'pending'}`}>Today: {todayStatusLabel}</span>
+        <div className="log-today quick-log">
+          <StatusPicker
+            value={status}
+            onChange={handleStatusSelect}
+            size="medium"
+            variant="compact"
+            requireHoldForRed
+          />
+          <div className="saved-row">
+            <span className="saved-meta">{lastSavedLabel}</span>
+            {showSavedToast && <span className="saved-toast">Saved ✓</span>}
+          </div>
+        </div>
       </header>
 
       <div className="card logging-card hero-card">
         <div className={`today-status ${entry?.status ?? 'pending'}`}>
           <div>
             <p className="subtle">Today’s check-in</p>
-            <strong>{entry ? todayStatusLabel : 'Not logged yet'}</strong>
+            <strong>{entry ? todayStatusLabel : 'Pick a log for today'}</strong>
           </div>
           <span className="today-icon" aria-hidden>
             {entry ? statusMeta[entry.status].icon : '🗓️'}
@@ -218,13 +231,6 @@ const HomePage = ({
             <strong>Quick nudge:</strong> You have not logged today yet.
           </div>
         )}
-        <div className="log-today">
-          <StatusPicker value={status} onChange={handleStatusSelect} size="large" requireHoldForRed />
-          <div className="saved-row">
-            <span className="saved-meta">{lastSavedLabel}</span>
-            {showSavedToast && <span className="saved-toast">Saved ✓</span>}
-          </div>
-        </div>
         {tracker.dailyQuestionEnabled && (
           <div className="daily-question note-panel">
             <div className="note-panel-header">
